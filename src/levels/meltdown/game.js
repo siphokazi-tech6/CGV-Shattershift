@@ -186,6 +186,9 @@ function createEmitter() {
   };
 }
 
+const _panV = new THREE.Vector3();
+const _panR = new THREE.Vector3();
+
 /** Stand-in for MeltdownAudio when the host wants the level silent. */
 const SILENT_AUDIO = new Proxy({}, { get: (_, key) => (key === "ready" ? false : () => {}) });
 
@@ -436,6 +439,9 @@ export class MeltdownGame {
     }
     this._timers.length = 0;
     this.phase = "idle";
+    // The alarm comes back with a fresh run (the blackout silenced it).
+    this._alarmOff = false;
+    this._moanIn = undefined;
     this.cut = null;
     this.fade.value = this.fade.target = 0;
     this.fade.override = null;
@@ -535,6 +541,26 @@ export class MeltdownGame {
     this.credits.toggle(false);
     this.runner.firing = false;
     this.held.clear();
+  }
+
+  /** Where a point is heard from: -1 (left) .. 1 (right) of the camera, and how far. */
+  _placeOf(position) {
+    const cam = this.camera;
+    _panV.copy(position).sub(cam.position);
+    _panR.setFromMatrixColumn(cam.matrixWorld, 0);
+    const distance = _panV.length();
+    return { pan: THREE.MathUtils.clamp(_panV.dot(_panR) / Math.max(4, distance), -0.85, 0.85), distance };
+  }
+
+  /** One of the patients, heard where it is (the recorded set, or the synthesized growl). */
+  _patientSound(kind, position = null, strength = 1) {
+    if (!this.sfx) {
+      if (kind === "growl" || kind === "shriek" || kind === "roar") this.audio.growl(strength);
+      else if (kind !== "death") this.audio.groan(strength * 0.8);
+      return;
+    }
+    const at = position ? this._placeOf(position) : { pan: 0, distance: 0 };
+    this.sfx.patient(kind, { strength, ...at });
   }
 
   /** Pause or resume: freezes nothing by itself (the host stops calling update), but silences the level. */
@@ -794,24 +820,34 @@ export class MeltdownGame {
       const near = Math.max(0, 1 - position.distanceTo(this.avatar.root.position) / 30);
       this.trauma = Math.min(1, this.trauma + near * 0.5);
       audio.crash(0.5 + near * 0.5);
+      this.sfx?.debrisFall(0.4 + near * 0.6, this._placeOf(position).pan);
     });
     on("duct-cleared", () => audio.clang());
     // A patient lunging out at you: the growl as it goes for you.
     on("patient-lurch", ({ position }) => {
       const near = Math.max(0.3, 1 - position.distanceTo(this.avatar.root.position) / 30);
-      audio.growl(near);
-      audio.groan(near * 0.5);
+      this._patientSound(Math.random() < 0.5 ? "shriek" : "growl", position, 0.6 + near * 0.6);
     });
-    on("patient-seen", () => audio.stinger());
+    // In the dark, the beam finds one standing there - and it says something.
+    on("patient-seen", ({ position }) => {
+      audio.stinger();
+      this._patientSound("speech", position, 0.9);
+    });
     on("beat", ({ key }) => {
       const beat = BEATS.find((b) => b.key === key);
       if (beat?.dark) {
         audio.powerDown();
+        // The power dies, and the alarm with it. Vale has something to say.
+        this._alarmOff = true;
+        if (this.story?.layer && this.mode !== "endless-labs") this.story.layer.talk(STORY_LINES.valeBlackout[0]);
         this._after(0.9, () => {
           audio.beamOn();
           hud.showBanner("POWER FAILURE", "YOUR LAUNCHER HAS A LIGHT", 3200);
         });
-      } else if (key === "stairwell") audio.powerUp();
+      } else if (key === "stairwell") {
+        audio.powerUp();
+        this._alarmOff = false;
+      }
     });
     // The lifts (placeholder cutscenes - see elevator.js).
     on("lift-arrived", () => {
@@ -1097,6 +1133,19 @@ export class MeltdownGame {
       this.sfx.updateBrokenGlass(V.sfxPos, playing && r.speed > 1 && r.height < 0.12);
       this.sfx.updateEnvironment({ fire: { distance: Math.max(0, r.distance - r.fireDistance), intensity: 1, offsetX: 0 } });
       this.sfx.updateElevator(level.endLift?.state.velocity ?? 0, this.phase === "depart");
+      // The fire alarm (dead with the power), and your breathing - harder as you weaken.
+      const running = playing && this.phase === "run";
+      const breach = this.phase === "story" && this.director?.stage === "breach";
+      this.sfx.updateAlarm((running || breach) && !this._alarmOff ? 0.85 : 0, 0.12);
+      this.sfx.updateBreath(running ? 0.4 + (1 - r.vitality / START_VITALITY) * 0.5 : 0);
+      // They're loose: somewhere in the labs, one moans, or begs.
+      if (running) {
+        this._moanIn = (this._moanIn ?? 2.5) - dt;
+        if (this._moanIn <= 0) {
+          this._moanIn = 3.5 + Math.random() * 5;
+          this.sfx.patient(Math.random() < 0.3 ? "speech" : "moan", { strength: 0.75, distance: 12 + Math.random() * 24, pan: Math.random() * 1.6 - 0.8 });
+        }
+      }
     }
     // Somewhere above, the building giving way: every so often a distant
     // collapse booms through the structure and shakes the corridor.
@@ -1104,7 +1153,8 @@ export class MeltdownGame {
       this._collapseIn = (this._collapseIn ?? 8) - dt;
       if (this._collapseIn <= 0) {
         this._collapseIn = 12 + Math.random() * 12;
-        this.audio.distantCollapse(0.6 + Math.random() * 0.4);
+        if (this.sfx) this.sfx.distantCollapse(0.6 + Math.random() * 0.4);
+        else this.audio.distantCollapse(0.6 + Math.random() * 0.4);
         this.trauma = Math.min(1, this.trauma + (this.reducedMotion ? 0.05 : 0.2));
       }
     }
@@ -1503,6 +1553,7 @@ export class MeltdownGame {
         debris.burst(point, { kind: "concrete", count: 6, speed: 2.5, size: 0.1 });
         debris.dust(point, { size: 1.2, life: 0.6, color: 0x5a2a22 });
         audio.thud();
+        this._patientSound("pain", point, 0.9);
       } else {
         debris.sparks(point, { count: 12 });
         audio.clang();
@@ -1536,6 +1587,7 @@ export class MeltdownGame {
       this.sfx?.impact(0.6);
       audio.thud();
       audio.bodyFall();
+      this._patientSound("death", point, 1);
     } else if (result.kind === "powerup") {
       const serum = this._applyPowerup(result.powerupKind);
       debris.burst(result.position, { kind: "power", count: 30, speed: 5 });
@@ -1634,7 +1686,7 @@ export class MeltdownGame {
 
     const hazard = duct ?? hits[0];
     // Caught by one of them: it snarls as it hits you.
-    if (hazard.userData.patient) audio.growl(1.1);
+    if (hazard.userData.patient) this._patientSound("growl", null, 1.2);
     // Crashing through an intact pane shatters it - you get through, but it
     // costs you like any other hit.
     if (hazard.userData.glass) {
@@ -1679,6 +1731,7 @@ export class MeltdownGame {
     hud.toast("HIT", dropped ? `-${dropped} SPHERES` : "", "warn");
     audio.stumble();
     this.sfx?.impact(1);
+    this.sfx?.hurt();
     // The dropped balls physically spill out behind you.
     if (dropped) debris.burst(centre, { kind: "ball", count: Math.min(12, dropped), speed: 3, up: 3 });
 
@@ -1913,23 +1966,30 @@ export class MeltdownGame {
     });
     on("wave", ({ index }) => {
       hud.showBanner(index === 1 ? "THEY WERE WAITING" : "MORE OF THEM", index === 1 ? "THEY'RE LETTING THEM OUT" : "THE MACHINE ROOM", 2600);
-      audio.groan(1);
+      this._patientSound("horde", null, 0.8);
+      // Vale, on the roof's PA, as he lets them out.
+      if (index === 1 && this.story?.layer && this.mode !== "endless-roof") this.story.layer.talk(STORY_LINES.valeRoof[0]);
     });
-    on("patient-windup", () => audio.growl());
+    on("patient-windup", ({ position }) => this._patientSound("growl", position, 1));
     on("patient-climb", ({ position }) => {
-      audio.groan(0.8);
+      this._patientSound(Math.random() < 0.5 ? "moan" : "growl", position, 0.9);
       hud.toast("OVER THE LEDGE", position.x < 0 ? "WEST SIDE" : "EAST SIDE");
     });
     on("patient-stunned", ({ position }) => {
       debris.dust(position.clone().setY(1), { size: 2 });
       audio.clang();
+      this._patientSound("pain", position, 0.9);
     });
-    on("enemy-fall", () => {
-      audio.scream();
+    on("enemy-fall", ({ enemy, position }) => {
+      if (!this.sfx) audio.scream();
+      else if (enemy?.kind === "scientist") this.sfx.play("scream-m", { ...this._placeOf(position), volume: 0.6 });
+      else this._patientSound("shriek", position, 0.9);
       hud.toast("OVER THE EDGE", "");
     });
-    on("enemy-down", ({ enemy }) => {
+    on("enemy-down", ({ enemy, position }) => {
       audio.bodyFall();
+      if (enemy?.kind === "scientist") this.sfx?.play("hurt-m", { ...this._placeOf(position), volume: 0.7 });
+      else this._patientSound("death", position, 1);
       hud.toast("DOWN", enemy.kind === "scientist" ? "SCIENTIST" : "");
     });
     // The canisters, the drop and the brute (roof.js).
@@ -1940,6 +2000,7 @@ export class MeltdownGame {
       debris.dust(position, { size: 4, life: 1.4, color: 0x2a1a12 });
       audio.crash(1.3);
       this.sfx?.impact(1);
+      this.sfx?.explosion(1, this._placeOf(position).pan);
       this.trauma = Math.min(1, this.trauma + 0.6);
       if (downs > 1) hud.toast("CHAIN BLAST", `${downs} DOWN`, "power");
       // Too close to it yourself.
@@ -1956,7 +2017,8 @@ export class MeltdownGame {
       hud.toast("SUPPLY DROP", "SPHERES AND A SERUM", "power", 2400);
     });
     on("brute", () => {
-      audio.growl(1.3);
+      if (this.sfx) this.sfx.patient("roar", { strength: 1.2 });
+      else audio.growl(1.3);
       hud.showBanner("A BIG ONE", "TWO SPHERES WON'T STOP IT", 2600);
     });
     on("orb-fired", () => audio.zap());
@@ -1993,10 +2055,12 @@ export class MeltdownGame {
       const near = Math.max(0.2, 1 - position.distanceTo(this.hero.position) / 30);
       this.trauma = Math.min(1, this.trauma + strength * near * 0.7);
       audio.crash(0.4 + near * strength * 0.6);
+      this.sfx?.explosion(0.4 + near * strength * 0.6, this._placeOf(position).pan);
     });
     on("tremor", ({ strength }) => {
       this.trauma = Math.min(1, this.trauma + strength * 0.55);
       audio.crash(0.25 + strength * 0.3);
+      this.sfx?.distantCollapse(0.5 + strength * 0.5);
       if (this.phase === "roof") hud.toast("THE BUILDING IS GOING", "", "warn", 1400);
     });
     on("roof-fire", ({ position }) => {
@@ -2039,7 +2103,8 @@ export class MeltdownGame {
         on: {
           fail: () => {
             this._latch.falling = true;
-            this.audio.scream?.();
+            if (this.sfx) this.sfx.fallScream();
+            else this.audio.scream?.();
           },
           retry: () => {
             // Back on the roof just before the jump; it waits for you.
@@ -2175,6 +2240,7 @@ export class MeltdownGame {
     this.hud.toast(hit.source === "fire" ? "BURNING" : "HIT", "", "warn");
     this.audio.stumble();
     this.sfx?.impact(hit.source === "patient" ? 1 : 0.7);
+    this.sfx?.hurt(hit.source === "patient" ? 1.1 : 0.85);
     this.debris.sparks(this.avatar.root.position.clone().setY(1.2), { count: 16 });
     if (r.vitality <= 0) {
       r.alive = false;
@@ -2189,7 +2255,8 @@ export class MeltdownGame {
     r.vitality = 0;
     r.firing = false;
     this.trauma = 1;
-    this.audio.scream?.();
+    if (this.sfx) this.sfx.fallScream();
+    else this.audio.scream?.();
     this.hud.toast("YOU FELL", "", "warn", 2400);
     this._roofSummary(false, "YOU FELL");
   }
@@ -2357,6 +2424,20 @@ export class MeltdownGame {
     this.scene.fog.density = 0.0058 + chaos * 0.007;
     // The wind across the top of the tallest tower in the city, gusting.
     this.sfx?.updateWind(playing ? 0.7 + Math.sin(time * 0.31) * 0.2 + Math.sin(time * 1.13) * 0.1 : 0.3);
+    // The alarm below, through the roof hatches; your breath, moving and hurt.
+    const fighting = playing && this.phase === "roof";
+    this.sfx?.updateAlarm(fighting ? 0.55 : 0, 0.65);
+    this.sfx?.updateBreath(fighting ? Math.min(1, this.hero.velocity.length() / 6) * 0.5 + danger * 0.4 : 0);
+    // Them: one of the living ones, every few seconds, wherever it is.
+    if (fighting && this.sfx && roof) {
+      this._moanIn = (this._moanIn ?? 2) - dt;
+      if (this._moanIn <= 0) {
+        this._moanIn = 2.5 + Math.random() * 4;
+        const them = roof.enemies.filter((e) => e.alive && e.kind === "patient");
+        const one = them[Math.floor(Math.random() * them.length)];
+        if (one) this._patientSound(Math.random() < 0.25 ? "speech" : "moan", one.position, 0.8);
+      }
+    }
     this.renderer.toneMappingExposure = 1.0;
     this.audio.setFireProximity(0.25 + chaos * 0.5);
     this.audio.setDanger(Math.max(danger * 0.8, chaos * 0.65));

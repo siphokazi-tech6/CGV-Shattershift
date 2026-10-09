@@ -88,8 +88,10 @@ export class EndingDirector {
   _event(name) {
     const game = this.game;
     this.log.push(["event", name]);
-    if (name === "laugh") game.audio.growl?.();
-    else if (name === "outside") {
+    // (His laugh is the scene's "[laughs]": the voice plays it.)
+    if (name === "outside") {
+      // The tower behind, still coming down.
+      game.sfx?.buildingCollapse(0.55);
       // Outside: the real helicopter where the cabin is, flying on.
       this.cabin.root.visible = false;
       this.outsideT = this.t;

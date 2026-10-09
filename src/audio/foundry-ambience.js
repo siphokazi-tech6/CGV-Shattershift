@@ -13,6 +13,8 @@
  * unlocked. start() when the Foundry is live, stop() when you leave it.
  */
 
+import { outputFor } from "./output.js";
+
 export class FoundryAmbience {
   /** @param {() => AudioContext | null} getContext */
   constructor(getContext, { volume = 0.55 } = {}) {
@@ -31,7 +33,7 @@ export class FoundryAmbience {
     this.out = ctx.createGain();
     this.out.gain.setValueAtTime(0.0001, ctx.currentTime);
     this.out.gain.exponentialRampToValueAtTime(this.volume, ctx.currentTime + 1.5);
-    this.out.connect(ctx.destination);
+    this.out.connect(outputFor(ctx));
     this.noise ??= this._buffer(ctx, 3, false);
     this.brown ??= this._buffer(ctx, 4, true);
 

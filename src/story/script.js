@@ -14,7 +14,14 @@
  *
  * Names are placeholders the team allowed ("name them anything you want for
  * now"): change them in CAST and every scene follows.
+ *
+ * Every line is voiced (tools/audio/voices.py; the recordings are listed in
+ * src/audio/voice-lines.js). A subtitle stays up while its line is spoken;
+ * after changing a line's words, run the generator again to re-record it
+ * (until then it plays the old blip).
  */
+
+import { VOICE_LINES } from "../audio/voice-lines.js";
 
 export const GAME_TITLE = "FRACTURE RUN";
 
@@ -58,12 +65,23 @@ export function readTime(text) {
   return Math.max(1.6, 0.9 + words * 0.32);
 }
 
+/**
+ * Seconds a line is on screen: its own hold, or long enough to read - and
+ * never shorter than its recording takes to say (or Vale takes to laugh).
+ */
+export function lineHold(line) {
+  const base = line.hold ?? readTime(line.text);
+  const key = line.text.trim() === "[laughs]" ? "#laugh-maniac" : `${line.who}|${line.text}`;
+  const spoken = VOICE_LINES[key]?.[1] ?? 0;
+  return spoken ? Math.max(base, spoken + 0.35) : base;
+}
+
 /** Lay out a scene's untimed lines one after another. Returns new objects. */
 export function timeLines(lines, start = 0) {
   let t = start;
   return lines.map((line) => {
     const at = line.at ?? t;
-    const hold = line.hold ?? readTime(line.text);
+    const hold = lineHold(line);
     t = at + hold + (line.gap ?? 0.25);
     return { ...line, at, hold };
   });
@@ -192,6 +210,13 @@ export const SCENES = {
     { who: "halcyon", text: "Detonation in eight minutes." },
   ],
   fallen: [{ who: "sfx", text: "[the wind]", hold: 2 }],
+
+  /*
+   * Dr. Vale on the intercom during play (story runs only, no letterbox):
+   * the Labs when the power dies, and the roof when the first wave is let out.
+   */
+  valeBlackout: [{ who: "vale", text: "Lights out, Seven. My patients never needed them." }],
+  valeRoof: [{ who: "vale", text: "Did you think I'd leave the roof unguarded? Say hello to my children." }],
 
   /* ---- Phase 6: the ending ------------------------------------------- */
 

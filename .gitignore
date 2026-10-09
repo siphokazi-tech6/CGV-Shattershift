@@ -4,3 +4,4 @@ Thumbs.db
 node_modules/
 tests/story/shots/
 .vendor/
+__pycache__/

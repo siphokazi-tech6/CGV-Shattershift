@@ -26,19 +26,20 @@ import { StoryUI } from "./story-ui.js";
 import { ReactionHits } from "./reaction.js";
 import { CutscenePlayer } from "./cutscene.js";
 import { StoryVoice } from "./voice.js";
-import { readTime } from "./script.js";
+import { lineHold } from "./script.js";
 
 export class StoryLayer {
   /**
    * @param {object} o
    * @param {() => AudioContext|null} [o.getAudioContext]
+   * @param {object} [o.sfx]  the game's sound set (level1-audio.js): the stage directions' sounds
    * @param {HTMLElement[]} [o.blurTargets]
    * @param {object} [o.options]  { longWindows, holdInsteadOfMash, reducedMotion }
    */
-  constructor({ getAudioContext = () => null, blurTargets = [], options = {} } = {}) {
+  constructor({ getAudioContext = () => null, sfx = null, blurTargets = [], options = {} } = {}) {
     this.ui = new StoryUI({ blurTargets });
     this.reactions = new ReactionHits(this.ui);
-    this.voice = new StoryVoice(getAudioContext);
+    this.voice = new StoryVoice(getAudioContext, { sfx });
     this.player = new CutscenePlayer({ ui: this.ui, reactions: this.reactions, voice: this.voice });
     this.reactions.listen();
     this.player.listen();
@@ -105,11 +106,14 @@ export class StoryLayer {
   play(scene, { camera = null, ctx = {}, on = {}, deathSeconds = 1.8, deathLine = null } = {}) {
     this._unbind();
     this._death = null;
+    // A line said during play is cut off by the scene (its subtitle goes too).
+    if (this._talk.line) this.voice.stop();
     this.stopTalk();
     this._scene = scene;
     this._deathSeconds = deathSeconds;
     this._deathLine = deathLine;
     this.player.camera = camera;
+    this.voice.preload(scene.lines ?? []);
     const p = this.player;
     const bind = (name, fn) => fn && this._off.push(p.on(name, fn));
     bind("event", on.event);
@@ -144,6 +148,7 @@ export class StoryLayer {
     this._unbind();
     this._death = null;
     this.stopTalk();
+    this.voice.stop();
     this.player.stop();
     this.ui.reset();
     this.ui.hide();
@@ -153,6 +158,7 @@ export class StoryLayer {
     this.paused = paused;
     this.player.paused = paused;
     this.reactions.paused = paused;
+    this.voice.setPaused(paused);
     if (paused) {
       this.player.skipHeld = false;
       this.player.skipProgress = 0;
@@ -216,11 +222,11 @@ export class StoryLayer {
   _showTalk(line) {
     const t = this._talk;
     t.line = line;
-    t.left = line.hold ?? readTime(line.text);
+    t.left = lineHold(line);
     this.ui.show();
     this.ui.setGameplay(true);
     this.ui.say(line.who, line.text);
-    if (!/^\[.*\]$/.test(line.text.trim())) this.voice.blip(line.who);
+    this.voice.say(line);
     this.log.push(["talk", line.who, line.text]);
   }
 

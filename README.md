@@ -83,7 +83,18 @@ Beside it, the **Loadout** card: who you play as (female or male), skin tone, an
 
 The **pause menu** has the same buttons (resume, settings, restart, quit) and a guide with three tabs: the **moves** for the sector you are in (highlighted) and everywhere, the **spheres** (change type mid-run), and the **power-ups**, each with a picture of its capsule, what it does and how long it lasts.
 
-**Settings** (also the pause menu) has **Interface** (which HUD panels show - also the VIEW button), aim sensitivity, **graphics quality** (Auto, High, Medium, Low), and **Reduced motion & camera shake**. Choices persist locally. The story briefing, menu and Level 1 have looping background music; Level 3 retains its generated Web Audio effects.
+**Settings** (also the pause menu) has **Interface** (which HUD panels show - also the VIEW button), aim sensitivity, **graphics quality** (Auto, High, Medium, Low), and **Reduced motion & camera shake**. Choices persist locally.
+
+## Sound
+
+Every line is **voice acted**, every stage has **its own score**, and the tower sounds like it is burning and falling down. All of it is made by the scripts in `tools/audio/` (an open text-to-speech model and synthesis in code - see [`tools/audio/README.md`](./tools/audio/README.md)), so there is nothing to license and a changed line can be re-recorded in a minute.
+
+- **Dr. Okoro** is an ordinary scientist, terrified: his voice shakes, he gasps for air between sentences on the run, whispers behind the desk and shouts in the lift.
+- **Dr. Vale** is deep, slow and wrong - a growl under his voice and a whisper beside it - over the tower's intercom (the Labs when the lights die, the Skyline, the roof as he lets them out), with laughter after his taunts and a mad laugh in the helicopter. The pilot on the radio is his own voice, undisguised.
+- **HALCYON**, the building, announces after a chime; the **patients** growl, shriek, moan and beg ("help me", "it hurts") from wherever they are, and gurgle as they go down.
+- **The tower:** the fire alarm (it dies with the power in the Labs), your own huffing and puffing as you run (harder as you tire - the character you picked), pain when you're hit, demolition charges and the whole tower coming down on the Skyline, explosions, steel groaning, sprinklers bursting, glass everywhere.
+- **Music:** the Foundry is industrial (a press, an anvil, the countdown ticking), the Labs are horror (drone, heartbeat, a music box), the Skyline is the escape, the Roof the last stand; the wake-up and the failing lift are suspense, the quiet ride after Okoro is grief. The briefing keeps its piano and the ending the main theme. The music steps back whenever someone speaks.
+- Stage directions in the subtitles are heard too: `[a pistol shot]`, `[breathing hard]`, `[laughs]`.
 
 ## Play locally
 
@@ -163,7 +174,7 @@ Upload the contents of the demo archive so that `index.html` is at the top level
 
 ## Current status
 
-The whole story is playable from start to finish: the briefing film, the wake-up and the Foundry with Dr. Okoro, the Gravity Fault lift (its brake clamps as reaction prompts), the Labs with the breach, the bend attack and Okoro's sacrifice, the quiet ride up, the Skyline's demolition and bridge jump, the Roof, and the ending in the helicopter with the credits - over the main theme. A death restarts the sector you were in. The character and skin tone picked on the start screen are the player in every level. Endless runs each environment on its own. Music is managed by `src/audio/music-manager.js`. The Skyline's recorded sounds (fire, glass, wind) play in every level; the Foundry adds a synthesized machinery bed (`src/audio/foundry-ambience.js`), and the Labs its own synthesized effects - no siren, but the building collapsing somewhere above and the patients' growls. Each module has its own checks (`node tests/<story|meltdown|causeway|foundry|elevators>/run.js`). Frame rates still need to be measured on lab hardware with the `F` overlay.
+The whole story is playable from start to finish: the briefing film, the wake-up and the Foundry with Dr. Okoro, the Gravity Fault lift (its brake clamps as reaction prompts), the Labs with the breach, the bend attack and Okoro's sacrifice, the quiet ride up, the Skyline's demolition and bridge jump, the Roof, and the ending in the helicopter with the credits - over the main theme. A death restarts the sector you were in. The character and skin tone picked on the start screen are the player in every level. Endless runs each environment on its own. Music is managed by `src/audio/music-manager.js` (a score per stage), the voices by `src/story/voice.js`, and the recorded and rendered effects - the patients, the alarm, your breath, the building coming down - by `src/audio/level1-audio.js`, in every level; the Foundry adds a synthesized machinery bed (`src/audio/foundry-ambience.js`), and the Labs their own synthesized effects. Everything goes through one limiter (`src/audio/output.js`). Each module has its own checks (`node tests/<story|meltdown|causeway|foundry|elevators>/run.js`). Frame rates still need to be measured on lab hardware with the `F` overlay.
 
 ## Technology
 

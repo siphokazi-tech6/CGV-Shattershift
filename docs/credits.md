@@ -177,6 +177,22 @@ Level 1 sound effects supplied to the project:
 
 Exact source URLs and licence terms for the supplied SFX must be recorded before release.
 
+`GalacticTemple.ogg` no longer plays (each stage has its own score now, below); it is kept in the repository.
+
+### Voices, creatures, effects and music made for the project
+
+Made offline by the scripts in `tools/audio/` (how, and how to re-record a line: `tools/audio/README.md`). No recordings or music by anyone else are in them, except where noted.
+
+| Asset | Made with | Licence of what was used | Used in |
+| --- | --- | --- | --- |
+| Voice acting for every line (`assets/audio/voice/`, listed in `src/audio/voice-lines.js`): Dr. Okoro, Dr. Vale and his laugh, HALCYON, the pilot, Subject 07 | Kokoro-82M text-to-speech (hexgrad, https://huggingface.co/hexgrad/Kokoro-82M) run through kokoro-onnx (thewh1teagle, https://github.com/thewh1teagle/kokoro-onnx); voices `am_michael`, `bm_george`, `bm_lewis`, `bf_emma`, `af_heart`, `am_echo`; then each character's processing (`tools/audio/voices.py`) | Kokoro-82M: Apache-2.0; kokoro-onnx: MIT. The model's output is ours to use | Every cutscene, Okoro's talk in the Foundry and the lift, the Skyline's intercom, Vale on the Labs' and the roof's PA, the lift's radio |
+| The patients (`assets/audio/creatures/`): growls, moans, broken speech, shrieks, pain, death, roar, horde | Kokoro-82M (voices `am_onyx`, `bm_lewis`, `am_adam`, `bf_isabella`, `af_nicole`, `am_fenrir`), processed into creature sounds (`tools/audio/creatures.py`) | As above | The Labs and the Roof |
+| Effects (`assets/audio/sfx/`): fire alarm, the player's breathing, grunts, pain and fall scream, demolition charges, building collapse, explosions, distant collapses, steel groaning, debris, sprinkler burst, monitor beep, pistol, clatter, brakes, cable snap, lift chime and doors, clank, spark | Synthesized from first principles in numpy/scipy (`tools/audio/sfx.py`); the player's grunts and scream from Kokoro (`af_heart`, `am_echo`) | Our own | Every level and the lifts |
+| `glass-cascade.mp3` | Mixed from the team's supplied glass recordings above (Eaglaxle's shattering, Universfield's bottle), re-pitched, layered and spread | As those recordings | The breach's "glass, everywhere" |
+| Stage scores (`assets/audio/music/`): foundry, labs, skyline, roof, tension, grief | Composed and synthesized in code (`tools/audio/music.py`): wavetable oscillators, filters, drums, convolution reverb | Our own | The Foundry, the Labs, the Skyline, the Roof, the wake-up and the Gravity Fault lift, the quiet ride |
+
+Tools used only to make the files (not shipped with the game): espeak-ng through phonemizer (GPL-3.0, Kokoro's pronunciation), ffmpeg with the Rubber Band library (GPL, pitch and time), numpy and scipy (BSD).
+
 ## 4. Published techniques
 
 These are well-known graphics techniques, implemented in our own code. They are credited because the maths or the approach comes from published work.
@@ -197,7 +213,7 @@ These are well-known graphics techniques, implemented in our own code. They are 
 
 | Tool | Use | Note |
 | --- | --- | --- |
-| Claude (Anthropic AI assistant) | Helped write Level 1's and Level 3's code, shaders, tests and documentation | **Declare this according to the course's policy on AI assistance.** Every team member presenting a level should be able to explain the code; `docs/shaders-explained.md` and `docs/level-3-handoff.md` are written for that purpose |
+| Claude (Anthropic AI assistant) | Helped write Level 1's and Level 3's code, shaders, tests and documentation, and the audio tools (`tools/audio/`) that made the voices, creatures, effects and music | **Declare this according to the course's policy on AI assistance.** Every team member presenting a level should be able to explain the code; `docs/shaders-explained.md` and `docs/level-3-handoff.md` are written for that purpose |
 
 ## 6. Reference games (inspiration only, no assets used)
 

@@ -19,7 +19,7 @@ import { MusicManager } from "./src/audio/music-manager.js";
 import { Level1Audio } from "./src/audio/level1-audio.js";
 import { FoundryAmbience } from "./src/audio/foundry-ambience.js";
 import { GravityFaultRide } from "./src/elevators/gravity-fault.js";
-import { QuietRide } from "./src/elevators/quiet-ride.js";
+import { QuietRide, LINES as RADIO_LINES } from "./src/elevators/quiet-ride.js";
 import { ShatterFX } from "./src/fx/shatter.js";
 import { SphereImpactFX } from "./src/fx/sphere-impact.js";
 import { CollectibleSet, foundSummary } from "./src/systems/collectibles.js";
@@ -191,6 +191,8 @@ document.body.classList.toggle("reduced-motion", !!settings.reducedMotion);
 // Level 3's existing synthesized effects remain independent.
 const music = new MusicManager();
 const level1Audio = new Level1Audio(() => music.context);
+// The player's breath, grunts and screams are the character's own.
+level1Audio.setCharacter(savedCharacter());
 // The Foundry's machinery, heard (synthesized on the same context).
 const foundryAmbience = new FoundryAmbience(() => (music.context?.state === "running" ? music.context : null));
 // Level 1's GPU glass shards, for the Foundry (the Causeway has its own; the
@@ -218,6 +220,8 @@ addEventListener("keydown", unlockMusic);
  */
 const story = new StoryLayer({
   getAudioContext: () => music.context,
+  // The stage directions' sounds ([breathing hard], [a pistol shot]...).
+  sfx: level1Audio,
   blurTargets: [canvas],
   options: { longWindows: settings.longReactions, holdInsteadOfMash: settings.holdInsteadOfMash, reducedMotion: settings.reducedMotion },
 });
@@ -667,7 +671,15 @@ function updateFoundry(dt, time) {
   // (Audio may only have been unlocked since the Foundry came up.)
   if (!foundryAmbience.running && foundry.root.visible) foundryAmbience.start();
 
-  if (state !== "playing" || paused) return;
+  if (state !== "playing" || paused) {
+    level1Audio.updateBreath(0);
+    level1Audio.updateAlarm(0);
+    return;
+  }
+  // Huffing on the run (harder as you tire), and the tower's fire alarm a
+  // few floors up, through the concrete.
+  level1Audio.updateBreath(0.32 + Math.min(1, foundrySpeed() / 14) * 0.3 + (1 - Math.max(0, health) / 100) * 0.35);
+  level1Audio.updateAlarm(0.6, 0.78);
 
   const { hits, grazes } = foundry.probe(foundryBox, distance);
 
@@ -697,6 +709,7 @@ function updateFoundry(dt, time) {
     combo = 1; comboTimer = 0;
     foundry.impact(1);
     level1Audio.impact(1);
+    level1Audio.hurt();
     foundryHud.setIntegrity(Math.max(0, health));
     triggerShake(0.45);
     showMessage(hazard.userData.barrier === "high" ? "LOW CLEARANCE" : "INTEGRITY DAMAGED");
@@ -859,30 +872,43 @@ function buildCauseway(mode = "story") {
 
 function wireCausewayEvents(level) {
   const on = (name, fn) => level.events.on(name, (payload) => { if (level === causeway) fn(payload); });
-  on("radio", (p) => { causewayHud.radio(p); });
+  // HALCYON and Dr. Vale over the intercom: the panel shows it, and they say it.
+  on("radio", (p) => { causewayHud.radio(p); story.voice.say({ who: p.speaker, text: p.text }); });
   on("title", (p) => causewayHud.title(`Sector 03 // Beat ${p.index + 1} of 3`, p.name));
   on("hint", (p) => causewayHud.hint(p.text));
   on("file", (p) => causewayHud.caseFile(p.lines, p.found, p.total));
-  on("sprinkler", () => causewayHud.hint("Sprinkler open: fires below are going out"));
+  on("sprinkler", () => { causewayHud.hint("Sprinkler open: fires below are going out"); level1Audio.sprinklerBurst(); });
   on("serum", () => level1Audio.serumCollected());
   on("sphere-cache", () => level1Audio.sphereCollected());
   on("vent", () => causewayHud.hint("Vent clear: the smoke is thinning"));
   on("extinguish", (p) => { if (p.by === "cryo") showMessage(`CRYO // ${p.count} FIRE${p.count > 1 ? "S" : ""} OUT`); });
   on("collapse-warning", () => causewayHud.hint("Ceiling giving way: watch the red ring"));
   on("collapse-start", (p) => level1Audio.startFalling(p.id));
-  on("collapse-landed", (p) => { level1Audio.stopFalling(p.id); level1Audio.impact(0.9); triggerShake(0.25); });
+  on("collapse-landed", (p) => { level1Audio.stopFalling(p.id); level1Audio.impact(0.9); level1Audio.debrisFall(0.8); triggerShake(0.25); });
   on("glass-break", (p) => { level1Audio.glassBreak(); level1Audio.addGlassDebris(p.position, p.radius); });
   on("pod-break", () => level1Audio.podBreak());
   on("explosion", (p) => {
+    level1Audio.explosion(p.strength ?? 1);
     triggerShake(0.55 * p.strength);
     run.flash = Math.max(run.flash, 0.35 * p.strength);
     // Fright: a blast behind you makes you run.
     if (state === "playing") run.surge = Math.min(1.5, run.surge + 0.9 * p.strength);
   });
-  on("tower-collapse", () => { if (state === "playing") run.surge = Math.min(1.5, run.surge + 0.5); });
+  on("tower-collapse", () => {
+    level1Audio.buildingCollapse(0.85);
+    if (state === "playing") run.surge = Math.min(1.5, run.surge + 0.5);
+  });
   on("pod-break", () => triggerShake(0.3));
-  on("tremor", (p) => { run.rumble = { t: 0, duration: p.duration, strength: p.strength * (settings.reducedMotion ? 0.25 : 1) }; });
-  on("chase-start", () => causewayHud.title("Structural failure", "Keep moving", 2.4));
+  on("tremor", (p) => {
+    level1Audio.distantCollapse(0.5 + (p.strength ?? 0.5) * 0.5);
+    run.rumble = { t: 0, duration: p.duration, strength: p.strength * (settings.reducedMotion ? 0.25 : 1) };
+  });
+  on("chase-start", () => {
+    causewayHud.title("Structural failure", "Keep moving", 2.4);
+    // The bridge behind you: steel giving way, and the slabs going down.
+    level1Audio.metalGroan(1.1);
+    level1Audio.distantCollapse(1);
+  });
   on("chase-end", () => { causewayHud.warning(null); causewayHud.hint("Bridge section secured behind you"); });
   on("gate-armed", () => causewayHud.hint("Lift gate ahead: locks I, II, III", 3.2));
   on("lock", (p) => showMessage(`LOCK ${["I", "II", "III"][p.index]} // NEXT: ${["II", "III", ""][p.index]}`));
@@ -925,6 +951,7 @@ function damage(amount, label) {
   run.damage = 1;
   run.slow = 0.6;
   causeway?.impact(1);
+  level1Audio.hurt(Math.min(1.2, 0.6 + amount / 40));
   triggerShake(0.45);
   showMessage(label);
   updateUI();
@@ -1042,6 +1069,9 @@ function updateCauseway(dt, time) {
   if (health <= 0) { updateUI(); endRun(false, exposure > 0 ? "fire" : "smoke"); return; }
   level1Audio.updateEnvironment(causeway.audioEnvironment(_playerPos));
   level1Audio.updateBrokenGlass(_playerPos, run.speed > 1 && jumpHeight < 0.12);
+  // Huffing (harder sprinting, and hurt), and the research wing's fire alarm.
+  level1Audio.updateBreath(THREE.MathUtils.clamp(run.speed / CAUSEWAY_SPEED.sprint, 0, 1) * 0.7 + (1 - Math.max(0, health) / 100) * 0.3);
+  level1Audio.updateAlarm(causewayMode === "story" ? 0.85 : 0.55, 0.1);
 
   // ---- Bridge collapse chase -------------------------------------------
   const chase = causeway.state.chase;
@@ -1503,6 +1533,10 @@ async function enterMeltdown() {
   foundryLift = null;
   currentLevel = 3; state = "lift"; transitionTarget = 3; liftTimer = 0;
   health = 100; shake = 0;
+  music.playStage("labs");
+  level1Audio.preloadStage("labs");
+  level1Audio.preloadStage("common");
+  story.voice.preload(STORY_LINES.valeBlackout);
   // Spheres left over from the foundry become a few extra balls.
   const balls = meltdownBalls();
   // Built during the lift ride? Then it is ready (or nearly).
@@ -1991,6 +2025,9 @@ function startGravityLift({ boarded = false } = {}) {
   // Build Level 3 now, behind the black, so it is ready when the ride ends.
   prepareMeltdown();
   rideNext = "labs";
+  music.playStage("tension");
+  level1Audio.preloadStage("lift");
+  story.voice.preload([...STORY_LINES.liftFault, ...STORY_LINES.liftBreaks, ...STORY_LINES.liftSaved]);
   gravityLift = new GravityFaultRide({
     renderer, spheres: ammo, reducedMotion: settings.reducedMotion, boarded,
     // The same character as in the Foundry (null while it is still loading),
@@ -2003,6 +2040,7 @@ function startGravityLift({ boarded = false } = {}) {
     story: storyRun && runKind === "story" ? { layer: story, okoroTemplate } : null,
   });
   gravityLift.onPointerMove(pointer.x, pointer.y);
+  bindRideSounds(gravityLift);
   // The ride has its own alerts; clear the game's message line for them.
   ui.message.classList.remove("show"); messageTimer = 0;
   updateUI();
@@ -2036,6 +2074,11 @@ function startQuietRide() {
   if (!causeway) buildCauseway("story");
   if (causeway) setCausewayActive(false);
   rideNext = "skyline";
+  // Alone, after Okoro: the grief, and the pilot on his radio.
+  music.playStage("grief");
+  level1Audio.preloadStage("lift");
+  level1Audio.preloadStage("skyline");
+  story.voice.preload(Object.values(RADIO_LINES).map(([, text]) => ({ who: "pilot", text })));
   gravityLift = new QuietRide({
     renderer, spheres: ammo, reducedMotion: settings.reducedMotion,
     character: playerBodyTemplate,
@@ -2044,8 +2087,40 @@ function startQuietRide() {
     // The launcher leans on the lift wall until they pick it up.
     assetBase: MELTDOWN_ASSET_BASE,
   });
+  bindRideSounds(gravityLift);
   ui.message.classList.remove("show"); messageTimer = 0;
   updateUI();
+}
+
+/**
+ * The lifts' sounds: the rides emit what happens (src/elevators/), this
+ * plays it. The story's Gravity Fault says some of it in stage directions
+ * instead ([the launcher clatters...], [the last cable snaps]), so those
+ * are left to the cues.
+ */
+function bindRideSounds(ride) {
+  const on = (name, fn) => ride.events.on(name, (p) => { if (gravityLift === ride) fn(p ?? {}); });
+  const told = !!ride.director;
+  on("tremor", () => level1Audio.distantCollapse(0.8));
+  on("cable-snap", (p) => { if (!p.story) level1Audio.play("cable-snap"); });
+  on("brake", () => level1Audio.play("brake"));
+  on("brake-slam", () => { level1Audio.impact(1); level1Audio.play("clank"); });
+  on("flicker", () => level1Audio.play("spark", { cooldown: 0.8, volume: 0.5 }));
+  on("launcher-land", () => { if (!told) level1Audio.play("clatter"); });
+  on("launcher-thud", () => level1Audio.impact(0.6));
+  on("clamp-shot", () => level1Audio.throwBall());
+  on("clamp-lock", () => level1Audio.play("clank"));
+  on("glass-crack", () => level1Audio.play("glassStep", { volume: 0.5, cooldown: 0.1 }));
+  on("glass-break", () => level1Audio.glassBreak());
+  on("depart", () => { level1Audio.play("lift-doors", { volume: 0.6 }); if (ride instanceof QuietRide) level1Audio.breath("pant"); });
+  on("arrive", () => level1Audio.play("lift-chime"));
+  on("chime", () => level1Audio.play("lift-chime"));
+  on("doors", () => level1Audio.play("lift-doors"));
+  // The quiet ride's radio: Kestrel One, calling for the doctor.
+  on("radio", ({ line }) => {
+    const entry = RADIO_LINES[`radio${line}`];
+    if (entry) story.voice.say({ who: "pilot", text: entry[1] });
+  });
 }
 
 /** Where the ride in `gravityLift` goes when it is done: "labs" or "skyline". */
@@ -2167,7 +2242,7 @@ function resetGame(mode = causewayMode) {
   endlessEnv = mode === "endless" ? "skyline" : null;
   resetStats(mode); state = "playing";
   level1Audio.startLevel();
-  music.playRound1();
+  music.playStage("skyline");
   causewayHud.show();
   if (mode === "endless") causewayHud.title("Endless lab", "Randomised. Faster every 250 m.", 2.2);
 }
@@ -2202,7 +2277,6 @@ function startCampaign() {
   runRecordable = true;
   resetStats("story");
   runKind = "story"; endlessEnv = null; storyBalls = null;
-  music.playRound1();
   enterFoundry();
   // Okoro brings the spheres: none until he hands over the bag.
   ammo = 0;
@@ -2234,12 +2308,11 @@ function beginOpening() {
   setWardLight(1);
   ui.fade.style.opacity = "0";
   run.fadeOut = 0;
+  // Waking up to the countdown (the monitor's beep is the scene's own cue).
+  music.playStage("tension");
   story.play(wakeScene({ ...ward.anchors, okoro }), {
     camera,
     on: {
-      event: (name) => {
-        if (name === "monitor") level1Audio.uiClick?.();
-      },
       done: ({ skipped }) => {
         // Holding Esc skips the whole opening, straight to the run.
         if (skipped || !ward) finishOpening();
@@ -2269,6 +2342,7 @@ function finishOpening() {
   cutsceneShowsPlayer = false;
   if (state !== "cutscene") return;
   state = "playing";
+  music.playStage("foundry");
   snapCamera = true;
   camera.fov = 68; camera.up.set(0, 1, 0); camera.updateProjectionMatrix();
   startFoundryGuide();
@@ -2512,6 +2586,8 @@ function beginSkylineBlast() {
   tower.onWhole = () => {
     s.flash = 1;
     s.sky.setVisible(true);
+    // The whole tower going: the sound of it arrives with the dust.
+    level1Audio.buildingCollapse(1);
     level1Audio.impact(1);
     level1Audio.glassBreak();
     level1Audio.podBreak?.();
@@ -2552,16 +2628,18 @@ function beginSkylineBlast() {
         if (name === "detonate") {
           if (!tower.started) tower.detonate();
           level1Audio.impact(0.6);
+          level1Audio.demolitionCharges(1);
         } else if (name === "tilt") {
           level1Audio.impact(0.9);
+          level1Audio.metalGroan(1.2);
           triggerShake(0.4);
-        } else if (name === "jump") level1Audio.throwBall?.();
-        else if (name === "caught") { level1Audio.impact(0.7); s.flash = 0.3; s.hands.visible = true; }
+        } else if (name === "jump") { level1Audio.throwBall?.(); level1Audio.grunt(); }
+        else if (name === "caught") { level1Audio.impact(0.7); level1Audio.grunt(); s.caught = true; s.flash = 0.3; s.hands.visible = true; }
         else if (name === "up") s.hands.visible = false;
       },
       // A miss: no hands on anything.
-      retry: () => { s.hands.visible = false; },
-      fail: () => level1Audio.impact(0.5),
+      retry: () => { s.hands.visible = false; s.caught = false; },
+      fail: () => { level1Audio.impact(0.5); level1Audio.fallScream(); },
       done: () => finishSkylineBlast(),
     },
   });
@@ -2675,6 +2753,7 @@ function updateMainCutscene(dt, time, frame) {
     scene.fog.density = causeway.fogDensity;
     scene.background.copy(causeway.hazeColor);
     if (skylineStory) {
+      level1Audio.updateBreath(skylineStory.caught ? 0 : 0.8);
       hideRampProps();
       skylineStory.tower.update(dt);
       skylineStory.sky.update(dt, time);
@@ -2705,6 +2784,10 @@ function enterFoundry() {
   shatterFX.clear();
   sphereImpact.clear();
   level1Audio.startLevel();
+  music.playStage("foundry");
+  level1Audio.preloadStage("foundry");
+  level1Audio.preloadStage("common");
+  story.voice.preload(STORY_LINES.foundryTalk);
   ui.fade.style.opacity = "1";
   run.fadeOut = 1;
   // (The Foundry's own section title says where you are: no second line over it.)
@@ -2755,6 +2838,10 @@ function enterSkyline() {
   } else disposeSkylineStory();
   state = "launch"; launchTimer = 0;
   level1Audio.startLevel();
+  music.playStage("skyline");
+  level1Audio.preloadStage("skyline");
+  level1Audio.preloadStage("common");
+  story.voice.preloadSpeakers(["halcyon", "vale"]);
   ui.fade.style.opacity = "1";
   run.fadeOut = 1;
   updateUI();
@@ -2782,6 +2869,10 @@ async function enterRoof() {
   setFoundryActive(false);
   currentLevel = 3; state = "lift"; transitionTarget = 3; liftTimer = 0;
   health = 100; shake = 0;
+  music.playStage("roof");
+  level1Audio.preloadStage("roof");
+  level1Audio.preloadStage("common");
+  story.voice.preload(STORY_LINES.valeRoof);
   applyQuality();
   game.show();
   updateUI();
@@ -2808,10 +2899,12 @@ function startEndless(env) {
   endlessRun.laps = 0; endlessRun.distance = 0; foundrySpeedScale = 1;
   ui.start.classList.remove("active");
   ui.endless.classList.remove("active");
-  music.playRound1();
   if (env === "skyline") {
     state = "playing";
     level1Audio.startLevel();
+    music.playStage("skyline");
+    level1Audio.preloadStage("skyline");
+    level1Audio.preloadStage("common");
     causewayHud.show();
     causewayHud.title("Endless // The Skyline", "Randomised. Faster every 250 m.", 2.2);
     return;
@@ -2860,7 +2953,6 @@ function restartStage(cp) {
   score = checkpoint.score;
   ammo = checkpoint.ammo;
   storyBalls = checkpoint.balls;
-  music.playRound1();
   if (checkpoint.stage === "labs") {
     setCausewayActive(false);
     enterMeltdown();
@@ -3052,6 +3144,7 @@ function endRun(won, reason = null, detail = null) {
   storyDeath = !won && storyRun && runKind === "story" && !!storyCheckpoint;
   restartButtonLabel();
   if (currentLevel === 1) music.gameOverDuck();
+  level1Audio.updateBreath(0);
   // Level 3 plays it itself (the MeltdownGame shares level1Audio).
   if (!won && currentLevel !== 3) level1Audio.gameOver();
   causewayHud.warning(null);
@@ -3172,6 +3265,10 @@ function clearPostLooks() {
 
 function updateGame(dt, time) {
   if ((state === "playing" || state === "lift") && !paused) runClock += dt;
+  // Someone is talking: the music and the beds step back so the words carry.
+  const speaking = story.voice.speaking;
+  music.voiceDuck(speaking);
+  level1Audio.duckForVoice(speaking);
   const inCauseway = currentLevel === 1 && causeway && causeway.root.visible;
   document.body.classList.toggle("pregame", state === "intro" || state === "launch");
   document.body.classList.toggle("paused", paused);
@@ -3559,6 +3656,8 @@ function quitToMenu() {
   closePause(); cancelStory();
   document.body.classList.remove("finale-film");
   storyRun = false;
+  // Nobody keeps talking over the menu (the intercom, a line mid-sentence).
+  story.voice.stop();
   level1Audio.cleanupLevel();
   if (photoActive) togglePhoto();
   ui.caption.classList.remove("show"); ui.launchControls.classList.remove("show");
@@ -3642,6 +3741,7 @@ for (const button of characterButtons) {
   button.addEventListener("click", () => {
     if (!CHARACTERS[button.dataset.character]) return;
     saveCharacter(button.dataset.character);
+    level1Audio.setCharacter(button.dataset.character);
     loadPlayerBody(button.dataset.character);
     meltdown?.setCharacter(button.dataset.character);
     showCharacterChoice();

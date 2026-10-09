@@ -268,6 +268,8 @@ export class LabsDirector {
     game.debris.burst(at, { kind: "glass", count: 24, speed: 5 });
     game.audio.glassShatter(true);
     game.sfx?.glassBreak();
+    // And what was inside, awake.
+    game._patientSound?.(this.tanks.indexOf(t) % 2 ? "growl" : "shriek", at, 0.85);
     game.trauma = Math.min(1, game.trauma + 0.25);
     t.walk = 0.001;
     this.log.push(["burst", this.tanks.indexOf(t)]);
@@ -370,8 +372,11 @@ export class LabsDirector {
     this.aimTimer = 0.45;
     this.flash = 1;
     o.lookAt(target.group.userData.worldPosition().setY(1.5), 1);
+    // His pistol, and the patient it hits.
+    this.game.sfx?.play("pistol", { volume: 0.55, cooldown: 0.3 });
     this.game.audio.thud?.();
     this.game.sfx?.impact(0.25);
+    this.game._patientSound?.("pain", target.group.userData.worldPosition(), 0.8);
     // The patient staggers (and is still there - the player's to deal with).
     target.group.userData.stagger?.();
     this.log.push(["pistol", Math.round(target.distance)]);
@@ -415,8 +420,9 @@ export class LabsDirector {
         event: (name) => {
           this.log.push(["event", name]);
           if (name === "hit") {
-            game.audio.growl?.();
+            game._patientSound?.("shriek", null, 1.3);
             game.audio.stumble?.();
+            game.sfx?.hurt(1.2);
             game.trauma = 1;
           } else if (name === "shot") {
             this.flash = 1;
@@ -424,6 +430,7 @@ export class LabsDirector {
             game.audio.thud?.();
             game.sfx?.impact(0.9);
             game.audio.bodyFall?.();
+            game._patientSound?.("death", null, 1);
           }
         },
         fail: () => {
@@ -569,7 +576,7 @@ export class LabsDirector {
   _hideEvent(name) {
     const game = this.game;
     this.log.push(["event", name]);
-    if (name === "crowd-turn") game.audio.groan?.(0.8);
+    if (name === "crowd-turn") game._patientSound?.("growl", null, 0.9);
     else if (name === "bag") {
       // Into your hands: his bag is gone from him; the HUD says you have it.
       if (this.okoro.bag) this.okoro.bag.visible = false;
@@ -579,11 +586,13 @@ export class LabsDirector {
     } else if (name === "okoro-run") {
       this.hide.okoroRunning = true;
       for (const c of this.crowd) c.chasing = true;
-      game.audio.groan?.(1);
+      // All of them, after him.
+      game._patientSound?.("horde", null, 1.1);
     } else if (name === "doors") {
       // The doors close on it.
       this._doors = 0;
       game.audio.clang?.();
+      game.sfx?.play("clank");
     } else if (name === "silence") {
       // His death is heard, not seen: the shouting cuts off.
       game.audio.bodyFall?.();
