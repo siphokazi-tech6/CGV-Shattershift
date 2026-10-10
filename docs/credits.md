@@ -170,8 +170,8 @@ Level 1 sound effects supplied to the project:
 - Game over: `universfield-marimba-game-over-250960.mp3` — Universfield.
 - Broken-glass footstep: `368343__johandeecke__glass-hit-32.wav` — JohanDeecke.
 - The wind on the roof: `wind1.wav` — source and licence details pending.
-- The lifts' machinery: `174908__oneirophile__noisy-old-elevator.wav` (in `soundtracks/`) — Oneirophile, Freesound (sound 174908); licence to be recorded by the supplier.
-- The lifts' music: `freesound_community-lift-music-by-kk-30497.mp3` (in `soundtracks/`) — "Lift Music" by KK, Freesound Community; licence to be recorded by the supplier.
+- Elevator machinery: `174908__oneirophile__noisy-old-elevator.wav` — oneirophile, Freesound sound 174908 (licence to be confirmed on its Freesound page).
+- Elevator music: `freesound_community-lift-music-by-kk-30497.mp3` — kk, via Freesound Community (licence to be confirmed).
 - Sphere throw: `floraphonic-swing-whoosh-9-198502.mp3` — Floraphonic.
 - Sphere cache / serum collected: `floraphonic-arcade-ui-6-229503.mp3` — Floraphonic.
 - Side-wall / ceiling ricochet: `freesound_community-wall-hit-1-100717.mp3` — Freesound Community.

@@ -22,6 +22,8 @@ export const AUDIO_CREDITS = [
   ["Game over", "Universfield"],
   ["Broken glass underfoot", "JohanDeecke"],
   ["Lift", "(source pending)"],
+  ["Lift machinery", "oneirophile - noisy old elevator (Freesound)"],
+  ["Lift music", "kk - lift music (Freesound Community)"],
   ["Sphere throw, pickups", "Floraphonic"],
   ["Ricochet", "Freesound Community"],
   ["UI click", "JustSomeSounds"],

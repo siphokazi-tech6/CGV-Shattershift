@@ -171,11 +171,25 @@ Read [`CONTRIBUTING.md`](./CONTRIBUTING.md) before making changes. In short: cre
 
 ### Department LAMP server
 
-Upload the contents of the demo archive so that `index.html` is at the top level. The project uses relative local paths, and Three.js r160 is kept in the repository (`lib/three/`) rather than loaded from a CDN, so the game runs offline and on networks that block jsDelivr (the lab machines do).
+Deployment is a zip uploaded to the Moodle submission (no SSH); the server only serves files, from a subfolder, and is case-sensitive (Linux). There is no bundler, so the build is a clean copy of what the browser loads:
+
+```text
+python tools/build-deploy.py
+```
+
+This writes `dist/fracture-run/` (only `index.html`, `main.js`, `styles.css`, `src/`, `lib/`, `assets/` - no tests, docs or node_modules) and `dist/fracture-run.zip` with `index.html` at the top level, after checking for absolute paths (`/...`), spaces in filenames and filenames whose case does not match the code. Play the build before uploading, from a subfolder and case-sensitive like the real server:
+
+```text
+python tools/serve.py 4173 dist
+```
+
+then open `http://localhost:4173/fracture-run/` and play it through (check the console for 404s). Upload `dist/fracture-run.zip` following Moodle's naming convention, then open the published URL in Chrome and play it again.
+
+Three.js r160 is kept in the repository (`lib/three/`) rather than loaded from a CDN, so the game runs offline and on networks that block jsDelivr (the lab machines do).
 
 ## Current status
 
-The whole story is playable from start to finish: the briefing film, the wake-up and the Foundry with Dr. Okoro, the Gravity Fault lift (its brake clamps as reaction prompts), the Labs with the breach, the bend attack and Okoro's sacrifice, the quiet ride up, the Skyline's demolition and bridge jump, the Roof, and the ending in the helicopter with the credits - over the main theme. A death restarts the sector you were in. The character and skin tone picked on the start screen are the player in every level. Endless runs each environment on its own. Music is managed by `src/audio/music-manager.js` (a score per stage), the voices by `src/story/voice.js`, and the recorded and rendered effects - the patients, the alarm, your breath, the building coming down - by `src/audio/level1-audio.js`, in every level; the Foundry adds a synthesized machinery bed (`src/audio/foundry-ambience.js`), and the Labs their own synthesized effects. Everything goes through one limiter (`src/audio/output.js`). Each module has its own checks (`node tests/<story|meltdown|causeway|foundry|elevators>/run.js`). Frame rates still need to be measured on lab hardware with the `F` overlay.
+The whole story is playable from start to finish: the briefing film, the wake-up and the Foundry with Dr. Okoro, the Gravity Fault lift (its brake clamps as reaction prompts), the Labs with the breach, the bend attack and Okoro's sacrifice, the quiet ride up, the Skyline's demolition and bridge jump, the Roof, and the ending in the helicopter with the credits - over the main theme. A death restarts the sector you were in. The character and skin tone picked on the start screen are the player in every level. Endless runs each environment on its own. Music is managed by `src/audio/music-manager.js` (a score per stage), the voices by `src/story/voice.js`, and the recorded and rendered effects - the patients, the alarm, your breath, the building coming down - by `src/audio/level1-audio.js`, in every level; the Foundry adds a synthesized machinery bed (`src/audio/foundry-ambience.js`), and the Labs their own synthesized effects. Everything goes through one limiter (`src/audio/output.js`). Each module has its own checks (`node tests/<story|meltdown|causeway|foundry|elevators>/run.js`). Frame rates still need to be measured on lab hardware (Chrome DevTools > Rendering > FPS meter).
 
 ## Technology
 

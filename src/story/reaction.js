@@ -58,7 +58,7 @@ export function reactionLadder(step, rng = Math.random) {
     kind: "sequence",
     keys: pickKeys(4, rng),
     window: Math.max(0.6, 0.85 - (step - 3) * 0.08),
-    then: { kind: "mash", keys: ["Space"], time: 3.2, gain: 0.085, decay: 0.32, label: "HOLD IT" },
+    then: { kind: "mash", keys: ["Space"], time: 3.2, gain: 0.085, decay: 0.32, label: "LOCK IT" },
   };
 }
 
@@ -77,7 +77,20 @@ export function struggleReaction({ time = 3.5 } = {}) {
   return { kind: "mash", keys: ["Space"], time, gain: 0.075, decay: 0.3, label: "PUSH IT OFF" };
 }
 
-const LABELS = { press: "PRESS", combo: "PRESS BOTH", sequence: "IN ORDER", mash: "MASH", hold: "HOLD" };
+const LABELS = { press: "PRESS", combo: "PRESS BOTH", sequence: "IN ORDER", mash: "TAP FAST", hold: "HOLD" };
+
+/**
+ * What the player physically does, in plain words, for the bar prompts -
+ * playtesters read a story label like "HOLD IT" as "hold the key" when the
+ * bar wants tapping. So it always says: "TAP SPACE FAST", "ALTERNATE A D
+ * FAST", or (with "Hold instead of mash") "HOLD SPACE".
+ */
+function howTo(kind, spec, keys) {
+  const names = keys.map((k) => (k === "Space" ? "SPACE" : k.replace(/^Key/, ""))).join(" ");
+  if (kind === "hold") return `HOLD ${names}`;
+  if (kind === "mash") return spec.alternate ? `ALTERNATE ${names} FAST` : `TAP ${names} FAST`;
+  return null;
+}
 
 export class ReactionHits {
   /**
@@ -156,7 +169,9 @@ export class ReactionHits {
     this.state = "running";
     this.failReason = null;
     const s = this._s;
-    const label = spec.label ?? (kind === "hold" && spec.kind === "mash" ? "HOLD" : LABELS[kind]);
+    // The story's verb ("LOCK IT", "SPRINT") and, for the bars, how: "LOCK IT - TAP SPACE FAST".
+    const how = howTo(kind, spec, s.keys);
+    const label = spec.label ? (how ? `${spec.label} - ${how}` : spec.label) : how ?? LABELS[kind];
     this.ui?.showReaction({
       label,
       keys: s.keys,

@@ -16,6 +16,8 @@
         }
       }
     </script>
+    <!-- No favicon file: an empty inline one stops the browser asking the server root for /favicon.ico. -->
+    <link rel="icon" href="data:," />
     <link rel="stylesheet" href="./styles.css" />
     <link rel="stylesheet" href="./src/ui/menu-fx.css" />
     <link rel="stylesheet" href="./src/ui/causeway-hud.css" data-causeway-hud />
@@ -245,7 +247,7 @@
             <input type="checkbox" id="longReactionsToggle" />
           </label>
           <label class="setting-row toggle-row">
-            <span>Hold instead of mash</span>
+            <span>Fill bars by holding the key instead of tapping it fast</span>
             <input type="checkbox" id="holdInsteadOfMashToggle" />
           </label>
         </div>
@@ -261,7 +263,7 @@
             <span><kbd>SPACE</kbd><kbd>SHIFT</kbd> Jump / slide</span>
             <span><kbd>C</kbd> Change camera</span>
             <span><kbd>HOLD CLICK</kbd> Fire the launcher (Sector 02, Roof) - it overheats</span>
-            <span><kbd>SPACE</kbd> Push a fallen duct (mash, Sector 02)</span>
+            <span><kbd>SPACE</kbd> Push a fallen duct (tap fast, Sector 02)</span>
             <span><kbd>WASD</kbd> Move on the roof, <kbd>SPACE</kbd> dodge / jump for the ladder</span>
             <span><kbd>P</kbd> Photo mode (Sectors 01, 03)</span>
             <span><kbd>M</kbd> Minimap</span>
@@ -348,6 +350,7 @@
         <div class="tab-panel" data-panel="m-labs" hidden>
           <div class="manual-grid">
             <article data-tone="fire" data-act="avoid"><h3>The fire front</h3><p>It's behind you the whole way. Slow down and it catches you.</p></article>
+            <article data-tone="amber" data-act="collect"><h3>Checkpoints</h3><p>Each new section of the Labs (the corridor, the blackout, the stairwell) is a checkpoint. Caught after one, you start again there, not at the top.</p></article>
             <article data-tone="hazard" data-act="avoid"><h3>Fallen ducts</h3><p>Jump onto them and off the far side - running into one is a hit. At the fire crossings, the duct is the only bridge.</p></article>
             <article data-tone="hazard" data-act="break"><h3>Patients</h3><p>Lurch out into your lane. In the dark they stalk you, following your lane until the last moment: shoot them (two hits) or sidestep late.</p></article>
             <article data-tone="blue" data-act="tool"><h3>The launcher's light</h3><p>When the power dies, your beam is the only light. Spheres glow - firing ahead is scouting.</p></article>
@@ -375,6 +378,7 @@
         <div class="tab-panel" data-panel="m-roof" hidden>
           <div class="manual-grid">
             <article data-tone="hazard" data-act="break"><h3>Patients</h3><p>Climb out of the hatches, stalk, wind up and charge in a straight line. Sidestep one near an open ledge and it goes over.</p></article>
+            <article data-tone="hazard" data-act="avoid"><h3>Open hatches</h3><p>The square holes the patients climb out of go straight down into the building. Step into one and you fall.</p></article>
             <article data-tone="serum" data-act="break"><h3>Scientists</h3><p>Fire slow orbs from their gadgets - dodge them (Space). Three hits each.</p></article>
             <article data-tone="fire" data-act="break"><h3>Gas canisters</h3><p>Red, by the cover. Shoot one and everyone near it goes down - chains into the next. Not too close yourself.</p></article>
             <article data-tone="cyan" data-act="collect"><h3>Supply drop</h3><p>A flare, a crate under a parachute: spheres and a serum. Walk into them or shoot them.</p></article>

@@ -144,7 +144,7 @@ const MOVES = [
   [k("Hold click"), "Fire the launcher <small>- it overheats</small>", ["labs", "roof"]],
   [k("RMB"), "Focus: slow time while you aim"],
   [k("Q", "E"), "Sphere type <small>(or the mouse wheel)</small>"],
-  [k("Space"), "Mash to push a fallen duct out of the way", ["labs"]],
+  [k("Space"), "Tap fast to push a fallen duct out of the way", ["labs"]],
   [k("C"), "Change camera"],
   [k("P"), "Photo mode", ["foundry", "skyline"]],
   [k("V"), "Choose what the HUD shows; " + k("H") + " hides it all"],

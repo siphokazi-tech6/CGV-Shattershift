@@ -1588,7 +1588,6 @@ function updateMeltdownFrame(dt, time) {
     health = meltdown.runner.vitality;
     ammo = meltdown.runner.balls;
   }
-  document.body.classList.toggle("aiming", state === "playing" && !photoActive && !story.player.active && !document.querySelector(".screen.active"));
 }
 
 function meltdownScore(s, escaped) {
@@ -1813,12 +1812,16 @@ loadMeltdownAssets(MELTDOWN_ASSET_BASE, { names: ["launcher"] }).then((assets) =
 /** Where it is this frame: on the camera (first person) or the shoulder. */
 function placeSkyLauncher(dt) {
   const on = currentLevel === 1 && !!causeway && (state === "playing" || state === "ended" || state === "lift") && !photoActive;
-  skyLauncher.rig.visible = on && !!skyLauncher.model && (cameraThird ? avatar.visible : state !== "lift");
+  // The lift ride's camera pulls out to show Subject 07 in the cabin, even
+  // from first person: there the launcher is on the shoulder, in the shot -
+  // never left behind on a camera that is now outside the lift.
+  const onShoulder = cameraThird || state === "lift";
+  skyLauncher.rig.visible = on && !!skyLauncher.model && (onShoulder ? avatar.visible : true);
   playerBody.hold = currentLevel === 1 ? 1 : 0;
   if (!skyLauncher.rig.visible) return;
   skyLauncher.recoil = Math.max(0, skyLauncher.recoil - dt * 7);
   const r = skyLauncher.recoil;
-  if (!cameraThird) {
+  if (!onShoulder) {
     if (skyLauncher.rig.parent !== camera) camera.add(skyLauncher.rig);
     const bob = settings.reducedMotion ? 0 : Math.sin(run.stepPhase * 2) * Math.min(1, run.speed / 8);
     skyLauncher.rig.position.set(0.34 + bob * 0.01, -0.34 + Math.abs(bob) * 0.012, -0.6 + r * 0.12);
@@ -2060,8 +2063,6 @@ function updateGravityLiftFrame(dt, time) {
   ui.fade.style.opacity = gravityLift.fade.toFixed(3);
   // A cutscene ride hides the game's HUD while it plays.
   document.body.classList.toggle("cutscene", !!gravityLift.cutscene);
-  // The crosshair is up while there are clamps to shoot.
-  document.body.classList.toggle("aiming", gravityLift.wantsAim && !photoActive && !document.querySelector(".screen.active"));
   ui.reticle.classList.toggle("hot", !!gravityLift.aimTarget);
   ui.reticle.classList.toggle("assist", !!gravityLift.aimTarget);
   if (gravityLift.result.done) finishGravityLift();
@@ -3476,7 +3477,6 @@ function updateGame(dt, time) {
   ui.reticle.classList.toggle("hot", !!aim.target);
   ui.reticle.classList.toggle("assist", !!aim.target && aim.assisted);
   if (causewayLive) causeway.setHighlight(aim.target);
-  document.body.classList.toggle("aiming", state === "playing" && !paused && !photoActive && !document.querySelector(".screen.active"));
 
   updatePendingThrows(simDt);
   updateProjectiles(simDt);
@@ -3548,8 +3548,23 @@ function animate() {
   renderer.info.reset();
   // Checks that step the game themselves (__dbg.manual) stop the real clock.
   if (!manualStep) updateGame(dt, clock.elapsedTime);
+  updateCursor();
   renderFrame();
   updatePerformance(rawDt);
+}
+
+/**
+ * The mouse pointer becomes the crosshair only while you are actually aiming:
+ * playing (or the first lift's clamps), with nothing over the game. Anywhere
+ * else - menus, the briefing, cutscenes, the serum card, pause, photo mode -
+ * the ordinary pointer stays visible. One rule, decided once per frame, so
+ * leaving a level by any path can never leave it hidden.
+ */
+function updateCursor() {
+  const overlay = !!document.querySelector(".screen.active") || powerups.open || !!prologue?.active ||
+    story.player.active || paused || photoActive || storyPlaying;
+  const aimingNow = !overlay && (state === "playing" || (state === "lift" && !!gravityLift?.wantsAim));
+  document.body.classList.toggle("aiming", aimingNow);
 }
 
 /* ---- Menus -------------------------------------------------------------- */
@@ -4084,6 +4099,7 @@ globalThis.__dbg = {
   get projectiles() { return projectiles; },
   get arsenal() { return arsenal; },
   get powerups() { return powerups; },
+  get skyLauncher() { return { rig: skyLauncher.rig, loaded: !!skyLauncher.model, cameraThird, avatarVisible: avatar.visible, level: currentLevel, photoActive }; },
   get missions() { return missions; },
   get postfx() { return postfx; },
   get music() { return music.snapshot(); },
@@ -4108,7 +4124,7 @@ globalThis.__dbg = {
    * runs in software GL where real frames are far too slow to play through.
    */
   step(frames = 1, dt = 1 / 30) {
-    for (let i = 0; i < frames; i += 1) { stepTime += dt; updateGame(dt, clock.elapsedTime + stepTime); }
+    for (let i = 0; i < frames; i += 1) { stepTime += dt; updateGame(dt, clock.elapsedTime + stepTime); updateCursor(); }
   },
   render: () => renderFrame(),
   keyDown(name) { keysDown.add(name); },

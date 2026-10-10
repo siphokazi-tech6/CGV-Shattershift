@@ -66,6 +66,8 @@ const ARRIVAL_CAMERA = new THREE.Vector3(0, 11.5, 8.5);
 const ARRIVAL_LOOK = new THREE.Vector3(0, 0.6, -3.4);
 
 const HATCHES = [new THREE.Vector3(-10, 0, 3), new THREE.Vector3(10, 0, -1), new THREE.Vector3(-6, 0, -12), new THREE.Vector3(8, 0, 10)];
+/** Half the hatch opening (1.2 m) less a little: your feet have to be over the hole, not the rim. */
+const HATCH_HOLE = 0.5;
 const MACHINE_DOOR = new THREE.Vector3(12.5, 0, -12.5);
 
 /** Seconds the helicopter waits at the ledge for you to jump for the ladder. */
@@ -1354,7 +1356,16 @@ export class RoofLevel {
    * ledge - the host's physics lets you fall there.
    */
   groundAt(p) {
+    if (this.overHatch(p)) return null;
     return Math.abs(p.x) <= EDGE && Math.abs(p.z) <= EDGE ? 0 : null;
+  }
+
+  /**
+   * Over one of the open hatches the patients climb out of? Those are holes
+   * (1.2 m square) down into the building: step in and you fall.
+   */
+  overHatch(p) {
+    return HATCHES.some((h) => Math.abs(p.x - h.x) < HATCH_HOLE && Math.abs(p.z - h.z) < HATCH_HOLE);
   }
 
   /** Nothing in the way between two points (for a patient deciding to charge)? */
