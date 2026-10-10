@@ -67,7 +67,7 @@ export function authoredLayout() {
   add(42, "cache", { x: C, y: 2.3 });
   add(50, "file", { x: C, y: 1.7, index: 0 });
   add(56, "hazard", { x: L, kind: "cart" }); pane(58, R);
-  radio(58, "halcyon", "Sprinkler bulbs are glass. Break one to flood the zone.");
+  radio(58, "halcyon", "Fire on Skybridge B. All personnel: sprinkler bulbs are glass. Break one to flood the zone.");
   add(64, "sprinkler", { x: -1.6 });
   fire(72, -1.6, 5.4, { height: 2.8 });
   add(70, "beacon", { x: -2.6 });
@@ -78,7 +78,7 @@ export function authoredLayout() {
   pane(100, C, { reinforced: true, hint: "Reinforced: two hits" }); add(100, "hazard", { x: R, kind: "cabinet" });
   add(112, "serum", { x: C, y: 1.7, serum: "prism" });
   pane(122, L); pane(122, C, { mirror: true });
-  radio(124, "halcyon", "Smoke in the ward. Break the vent covers to clear the air.");
+  radio(124, "halcyon", "Smoke in the ward. All personnel: break the vent covers to clear the air.");
   add(130, "beacon", { x: 2.6 });
   add(136, "vent", { side: -1, id: "v1" });
   fire(140, R, 3.4); add(140, "cache", { x: L, y: 1.6 });
@@ -98,7 +98,7 @@ export function authoredLayout() {
   /* ---------------- BEAT B - SKYBRIDGE ---------------- */
   add(242, "event", { event: "explosion", behind: 26, strength: 1 });
   add(246, "event", { event: "title", beat: 1 });
-  radio(248, "halcyon", "Skybridge B. Structural failure spreading behind you. Do not stop.");
+  radio(248, "halcyon", "Structural failure, Skybridge B. Evacuate the bridge.");
   add(256, "event", { event: "tower" });
   add(262, "event", { event: "chaseStart" });
   pane(272, C); add(272, "cache", { x: L, y: 2.2 });
@@ -121,7 +121,7 @@ export function authoredLayout() {
   pane(452, L); pane(452, R);
   add(466, "serum", { x: L, y: 1.6, serum: "shield" });
   add(478, "hazard", { x: R, kind: "cabinet" }); pane(478, L);
-  radio(484, "halcyon", "Resonance atrium ahead. The lift needs a three-lock sequence.");
+  radio(484, "halcyon", "Resonance atrium. Lift release requires the three-lock sequence.");
   add(490, "cache", { x: R, y: 2.2 });
   add(494, "sprinkler", { x: 0, gantry: true }); fire(502, C, 3.6);
   add(514, "collapse", { x: L, kind: "glass" });
@@ -132,7 +132,7 @@ export function authoredLayout() {
   /* ---------------- BEAT C - RESONANCE ATRIUM ---------------- */
   add(546, "event", { event: "title", beat: 2 });
   pane(554, L, { mirror: true }); pane(554, R, { mirror: true });
-  radio(558, "vale", "There's no sequence to cancel, Seven. There's only up.");
+  radio(558, "vale", "Break every lock you like, Seven. The charges don't care.");
   add(568, "sculpture", { x: C, speed: 1.4 });
   add(578, "sprinkler", { x: 0, ceiling: 6.0 });
   fire(586, L, 3.2, { height: 3.6 }); fire(586, R, 3.2, { height: 3.6 });
@@ -151,7 +151,7 @@ export function authoredLayout() {
   add(714, "file", { x: C, y: 1.7, index: 4 });
   fire(722, R, 3.0); pane(722, L, { mirror: true });
   add(732, "cache", { x: C, y: 2.2 });
-  radio(738, "halcyon", "Break locks one, two, three. In order.");
+  radio(738, "halcyon", "Lift release: locks one, two, three. In order.");
   add(740, "event", { event: "finale" });
   add(ROUTE.gate, "gate", { x: C });
   add(ROUTE.gate - 1, "sign", { x: C, y: 8.2, sign: "lift", facing: 1, width: 4.4, height: 1.1 });

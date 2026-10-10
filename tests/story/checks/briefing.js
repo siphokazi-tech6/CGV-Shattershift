@@ -1,8 +1,8 @@
 /**
  * The briefing film (src/story/prologue.js, from the menu): it loads, plays
  * every chapter in order with its caption, renders each one without an
- * error, has no voice, ends on the title and hands back to the menu; Esc
- * skips it.
+ * error, is narrated from recordings (not the browser's speech synthesis),
+ * ends on the title and hands back to the menu; Esc skips it.
  */
 
 import path from "node:path";
@@ -60,7 +60,7 @@ export async function run(page, { shots }) {
     const p = __dbg.prologue;
     let sawTitle = false;
     let guard = 0;
-    // No voice: nothing speaks and no audio element plays.
+    // The narration is recorded audio: the browser's speech synthesis stays silent.
     const speaking = typeof speechSynthesis !== "undefined" && speechSynthesis.speaking;
     while (p.active && guard++ < 600) {
       __dbg.step(1, 1 / 30);
@@ -70,7 +70,7 @@ export async function run(page, { shots }) {
   });
   check("it ends on the title", end.sawTitle, JSON.stringify(end));
   check("...then hands back (the overlay goes)", !end.active && end.overlayHidden, JSON.stringify(end));
-  check("there's no voice", !end.speaking);
+  check("no browser speech synthesis (the narration is recorded)", !end.speaking);
 
   const skip = await page.evaluate(async () => {
     __dbg.startBriefing();

@@ -257,6 +257,23 @@ export class CalibrationLift {
   }
 
   /**
+   * True only after a world-space point has crossed the doorway into the
+   * cabin. This is deliberately tighter than the shaft radius, so standing
+   * beside the lift or on its landing does not count as being inside.
+   */
+  containsPoint(point) {
+    this.root.updateMatrixWorld(true);
+    this._v.copy(point);
+    this.root.worldToLocal(this._v);
+    this._v.y -= this.state.cabinY;
+    const radial = Math.hypot(this._v.x, this._v.z);
+    return radial <= LIFT_RADIUS - 0.35
+      && this._v.z <= LIFT_RADIUS - 0.45
+      && this._v.y >= -0.35
+      && this._v.y <= 5.65;
+  }
+
+  /**
    * Level 1's ride camera: from `from` (the camera's position when the ride
    * began) to just behind the player in the cabin, then out and round the
    * shaft as the cabin climbs away. Writes world-space position and target.

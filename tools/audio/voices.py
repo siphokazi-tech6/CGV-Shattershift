@@ -10,9 +10,11 @@ Needs `pip install kokoro-onnx soundfile scipy` and ffmpeg with rubberband.
 
 Each character is a Kokoro voice plus a performance chain (dsp.py):
 
-  okoro    am_michael - an ordinary man, terrified: pitch pushed up, a shaky
-           voice (vibrato and tremor), breathy, gasping for air between
-           sentences; whispering behind the desk, shouting in the lift.
+  okoro    am_onyx + bm_daniel, speaking Nigerian English (accent.py writes
+           the accent into the pronunciation) - a Nigerian doctor, terrified:
+           one flowing take per line, pitch pushed up, breathing in the
+           pauses and, as he runs, panting under his words; whispering behind
+           the desk, shouting in the lift.
   vale     bm_george + bm_lewis - slowed, the pitch dropped ~4.6 semitones
            (the throat a little), a sub-octave growl and a whispered double under it;
            his intercom lines echo through the tower and end in laughter.
@@ -20,7 +22,8 @@ Each character is a Kokoro voice plus a performance chain (dsp.py):
            after a chime.
   pilot    Vale's own voice, undisguised and untreated, over a headset or a
            radio (he is the pilot - the reveal is heard as well as seen).
-  you      af_heart / am_echo (by the character picked) - exhausted.
+  narrator HALCYON's voice, without the PA's chime: the briefing film.
+  you      af_heart / am_puck (by the character picked) - clear, exhausted.
 
 Writes assets/audio/voice/*.mp3 and src/audio/voice-lines.js (the manifest
 the game reads: speech length, so subtitles stay up while a line is spoken).
@@ -37,6 +40,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(__file__))
 import dsp  # noqa: E402
+from accent import nigerian  # noqa: E402
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 OUT = os.path.join(ROOT, "assets", "audio", "voice")
@@ -74,21 +78,35 @@ class Voices:
         self.k = Kokoro(os.path.join(model_dir, "kokoro-v1.0.onnx"), os.path.join(model_dir, "voices-v1.0.bin"))
         style = self.k.get_voice_style
         self.styles = {
-            "okoro": (style("am_michael"), "en-us"),
+            "okoro": (0.6 * style("am_onyx") + 0.4 * style("bm_daniel"), "en-gb"),
             "vale": (0.65 * style("bm_george") + 0.35 * style("bm_lewis"), "en-gb"),
             "halcyon": (style("bf_emma"), "en-gb"),
             "you-f": (style("af_heart"), "en-us"),
-            "you-m": (style("am_echo"), "en-us"),
+            "you-m": (style("am_puck"), "en-us"),
         }
 
-    def say(self, who, text, speed=1.0):
+    def _create(self, who, text, speed, phonemes=False):
         style, lang = self.styles[who]
-        samples, sr = self.k.create(text, voice=style, speed=float(np.clip(speed, 0.5, 2.0)), lang=lang)
+        samples, sr = self.k.create(text, voice=style, speed=float(np.clip(speed, 0.5, 2.0)), lang=lang, is_phonemes=phonemes)
         x = samples.astype(np.float32)
         if sr != SR:
             from scipy.signal import resample_poly
             x = resample_poly(x, SR, sr).astype(np.float32)
         return dsp.trim(x, SR, -50, 0.02)
+
+    def say(self, who, text, speed=1.0):
+        return self._create(who, text, speed)
+
+    def say_nigerian(self, who, text, speed=1.0):
+        """The line in Nigerian English pronunciation (accent.py)."""
+        return self._create(who, nigerian(self.k.tokenizer, text), speed, phonemes=True)
+
+    def held(self, who, vowel, speed=0.6):
+        """A vowel held steady (the raw stuff of laughs and grunts): its middle, voiced part."""
+        x = self._create(who, vowel * 6 + ".", speed, phonemes=True)
+        env = dsp.envelope(x, SR, 0.02)
+        on = np.nonzero(env > env.max() * 0.4)[0]
+        return x[on[0] + int(0.06 * SR): on[-1] - int(0.06 * SR)]
 
 
 # --------------------------------------------------------------------------
@@ -117,18 +135,18 @@ def room(x, name):
 
 
 # --------------------------------------------------------------------------
-# Okoro: an ordinary scientist, terrified
+# Okoro: a Nigerian doctor, terrified
 # --------------------------------------------------------------------------
 
 OKORO = {
-    #           speed  pitch  vib-d  trem   breathy gasp
-    "urgent":  (1.06, 0.8, 0.035, 0.10, 0.10, 0.6),
-    "running": (1.10, 1.2, 0.04, 0.14, 0.18, 0.85),
-    "panic":   (1.17, 2.0, 0.06, 0.14, 0.16, 1.0),
-    "relief":  (1.00, 0.6, 0.025, 0.06, 0.14, 0.3),
-    "hushed":  (1.04, 0.9, 0.05, 0.10, 0.0, 0.7),
-    "tender":  (0.95, 0.6, 0.045, 0.08, 0.0, 0.5),
-    "shout":   (1.10, 3.0, 0.04, 0.08, 0.10, 0.9),
+    #           speed  pitch  vib    breathy lead   pause-breaths  pant under
+    "urgent":  (1.04, 0.8, 0.0,   0.06,   0.5,   0.5,           0.0),
+    "running": (1.08, 1.2, 0.0,   0.10,   0.7,   0.85,          0.30),
+    "panic":   (1.12, 2.0, 0.016, 0.10,   0.8,   0.7,           0.0),
+    "relief":  (0.98, 0.5, 0.0,   0.08,   0.0,   0.45,          0.0),
+    "hushed":  (1.02, 0.8, 0.014, 0.0,    0.4,   0.5,           0.0),
+    "tender":  (0.94, 0.5, 0.014, 0.0,    0.3,   0.45,          0.0),
+    "shout":   (1.08, 2.4, 0.0,   0.06,   0.7,   0.6,           0.0),
 }
 
 
@@ -153,60 +171,101 @@ def okoro_mood(line):
 
 def gasp(effort=0.8, seconds=0.24):
     """A quick, frightened intake of breath."""
-    g = dsp.breath(SR, seconds, inhale=True, effort=effort, throat=1.0, voiced=0.12, voice_hz=210)
-    return dsp.fade(g, SR, 0.01, 0.03) * 0.55
+    g = dsp.breath(SR, seconds, inhale=True, effort=effort, throat=0.95, voiced=0.1, voice_hz=150)
+    return dsp.fade(g, SR, 0.01, 0.03) * 0.5
 
 
-def shout(x):
-    """TTS cannot shout: push it there - higher, strained, brighter, driven."""
-    x = dsp.eq(x, SR, "peak", 1900, 7, 0.8)
-    x = dsp.eq(x, SR, "highshelf", 4200, 2.5)
-    x = dsp.eq(x, SR, "lowshelf", 220, -5)
-    x = dsp.drive(dsp.peak_normalize(x, 0.9), 2.6)
-    return dsp.compress(x, SR, -18, 5, 0.003, 0.08)
+def shout(x, amount=1.0):
+    """TTS cannot shout: lift it there - brighter, pushed, a little strained."""
+    x = dsp.eq(x, SR, "peak", 1900, 5 * amount, 0.8)
+    x = dsp.eq(x, SR, "lowshelf", 220, -3 * amount)
+    x = dsp.drive(dsp.peak_normalize(x, 0.9), 1 + 0.8 * amount)
+    return dsp.compress(x, SR, -18, 4, 0.004, 0.1)
+
+
+def pauses(x, min_len=0.12, floor_db=-30):
+    """The gaps between his phrases, in seconds: [(start, end), ...]."""
+    hop = int(SR * 0.01)
+    env = dsp.envelope(x, SR, 0.02)[::hop]
+    quiet = env < env.max() * dsp.db(floor_db)
+    runs, start = [], None
+    for i, q in enumerate(quiet):
+        if q and start is None:
+            start = i
+        elif not q and start is not None:
+            if (i - start) * 0.01 >= min_len:
+                runs.append((start * 0.01, i * 0.01))
+            start = None
+    return runs
+
+
+def breaths_in_pauses(x, level):
+    """A breath in each pause between phrases - in the gap, so the line still flows."""
+    if not level:
+        return x
+    out = x.copy()
+    end = len(x) / SR
+    for a, b in pauses(x):
+        if a < 0.2 or b > end - 0.05:
+            continue
+        dur = min(0.34, (b - a) * 0.85)
+        if dur < 0.1:
+            continue
+        g = dsp.breath(SR, dur, inhale=True, effort=0.5 + 0.45 * level, throat=0.95, voiced=0.08, voice_hz=140)
+        out = dsp.mix_into(out, dsp.fade(g, SR, 0.01, 0.03) * 0.45 * level, int((a + (b - a - dur) * 0.5) * SR))
+    return out
+
+
+def pant_under(x, level):
+    """Running while he talks: his breath under the words, loudest in the gaps."""
+    n = len(x)
+    out = np.zeros(n, dtype=np.float32)
+    at = 0.0
+    while at < n / SR:
+        i_len, e_len = dsp.RNG.uniform(0.15, 0.21), dsp.RNG.uniform(0.2, 0.27)
+        dsp.mix_into(out, dsp.breath(SR, i_len, inhale=True, effort=0.75, throat=0.95) * 0.6, int(at * SR))
+        at += i_len + 0.02
+        dsp.mix_into(out, dsp.breath(SR, e_len, inhale=False, effort=0.85, throat=0.95, voiced=0.3, voice_hz=118), int(at * SR))
+        at += e_len + dsp.RNG.uniform(0.05, 0.12)
+    # Out of his way while he speaks (the words must carry): heard in the gaps.
+    env = dsp.envelope(x, SR, 0.06)
+    duck = 1 - 0.97 * np.clip(env / (env.max() + 1e-9) * 5, 0, 1)
+    duck = np.convolve(duck, np.ones(int(SR * 0.04)) / int(SR * 0.04), mode="same")
+    return (out * duck * level * np.max(np.abs(x))).astype(np.float32)
 
 
 def okoro(v, line, speed_scale=1.0):
     mood = okoro_mood(line)
-    speed, semis, vib, trem, breathy, gasp_level = OKORO[mood]
-    parts, gaps = [], []
+    speed, semis, vib, breathy, lead_gasp, pause_breaths, pant = OKORO[mood]
     text = tts_text(line["text"])
-    chunks = sentences(text)
-    for i, sentence in enumerate(chunks):
-        x = v.say("okoro", sentence, speed * speed_scale)
-        if mood == "shout" or (mood == "panic" and sentence.endswith("!")):
-            x = dsp.pitch(x, SR, 1.0)
-            x = shout(x)
-        if i > 0:
-            # Fighting for air between sentences.
-            if gasp_level > 0.5:
-                parts.append(gasp(gasp_level * 0.8, 0.2 + 0.08 * (mood == "running")))
-            else:
-                parts.append(dsp.silence(SR, 0.12))
-        parts.append(x)
-    x = np.concatenate(parts)
+    # One take: the line flows as he would say it, in his own accent.
+    x = v.say_nigerian("okoro", text, speed * speed_scale)
+    if mood == "shout":
+        x = shout(x, 1.0)
+    elif mood == "panic" and text.rstrip().endswith("!"):
+        x = shout(x, 0.6)
     x = dsp.pitch(x, SR, semis)
-    x = dsp.vibrato(x, SR, 6.5 + (mood == "panic") * 1.5, vib)
-    x = dsp.tremolo(x, SR, 9.0, trem, jitter=3.0)
-    if mood == "running":
-        # Each footfall jolts the voice.
-        x = dsp.tremolo(x, SR, 2.6, 0.22)
+    if vib:
+        x = dsp.vibrato(x, SR, 7.0, vib)
     if breathy:
-        x = x + dsp.whisper(x, SR) * breathy * 2.2
+        x = x + dsp.whisper(x, SR) * breathy * 2.0
     if mood in ("hushed", "tender"):
         w = dsp.whisper(x, SR)
-        x = dsp.lowpass(x * (0.34 if mood == "hushed" else 0.5) + w * (1.6 if mood == "hushed" else 1.0), SR, 7000)
+        x = dsp.lowpass(x * (0.4 if mood == "hushed" else 0.55) + w * (1.3 if mood == "hushed" else 0.8), SR, 7000)
+    x = breaths_in_pauses(x, pause_breaths)
+    if pant:
+        x = x + pant_under(x, pant)
     speech = len(x) / SR
-    lead = gasp(gasp_level, 0.28) if gasp_level >= 0.5 else dsp.silence(SR, 0.05)
-    x = np.concatenate([lead, dsp.silence(SR, 0.03), x])
-    speech += len(lead) / SR + 0.03
+    lead = gasp(lead_gasp, 0.24) if lead_gasp else dsp.silence(SR, 0.05)
+    x = np.concatenate([lead, dsp.silence(SR, 0.02), x])
+    speech += len(lead) / SR + 0.02
     if mood == "shout" and "OVER HERE" in line["text"]:
         # Running away from you, down the corridor, drawing them off.
         x = dsp.lowpass(x, SR, 3800)
-        x = dsp.reverb(x, SR, rt60=1.4, wet=0.45, predelay=0.03, damp=3000)
+        x = dsp.reverb(x, SR, rt60=1.4, wet=0.4, predelay=0.03, damp=3000)
     else:
         x = room(x, SCENE_ROOM.get(line["scene"], "corridor"))
-    level = {"hushed": -22, "tender": -21, "shout": -16}.get(mood, -18)
+    level = {"hushed": -21, "tender": -20, "shout": -16}.get(mood, -17.5)
     return dsp.normalize(x, SR, level), speech
 
 
@@ -263,7 +322,8 @@ VALE_LAUGHS = {
     "Run all you like. Everything you are, I made.": "chuckle",
     "Lights out, Seven. My patients never needed them.": "chuckle",
     "Did you think I'd leave the roof unguarded? Say hello to my children.": "cackle",
-    "There's no sequence to cancel, Seven. There's only up.": "chuckle",
+    "Break every lock you like, Seven. The charges don't care.": "chuckle",
+    "The atrium's gone. There's no way down, Seven - and nobody is coming for you.": "chuckle",
 }
 
 
@@ -285,34 +345,87 @@ def vale(v, line, speed_scale=1.0):
     return dsp.normalize(x, SR, -16.5 if context == "close" else -17), speech
 
 
+_HELD = {}
+
+
+def _held(v, vowel, semis):
+    """Vale's held vowel, at a pitch (kept per half-semitone)."""
+    key = (vowel, round(semis * 2) / 2)
+    if key not in _HELD:
+        if (vowel, 0) not in _HELD:
+            _HELD[(vowel, 0)] = v.held("vale", vowel)
+        base = _HELD[(vowel, 0)]
+        _HELD[key] = base if key[1] == 0 else dsp.pitch(base, SR, key[1])
+    return _HELD[key]
+
+
+def _glide(x, semis):
+    """Read x faster or slower so its pitch slides by `semis` across it."""
+    n = len(x)
+    rate = 2 ** (np.linspace(0, semis, n) / 12)
+    pos = np.cumsum(rate)
+    pos = pos[pos < n - 1]
+    return np.interp(pos, np.arange(n), x).astype(np.float32)
+
+
+def _ha(v, vowel, semis, dur, amp=1.0, fall=-2.0, breath=0.5):
+    """One burst of laughter: the h (the vowel breathed), then the voice, falling."""
+    src = _held(v, vowel, semis)
+    need = int((dur + 0.12) * SR)
+    start = int(dsp.RNG.integers(0, max(1, len(src) - need)))
+    seg = _glide(src[start:start + need], fall)[: int(dur * SR)]
+    n = len(seg)
+    t = np.arange(n) / SR
+    h = dsp.whisper(seg, SR)
+    voice = np.clip((t - 0.03) / 0.015, 0, 1) * np.exp(-np.maximum(0, t - 0.05) / max(0.04, dur * 0.42))
+    air = np.exp(-t / 0.045) * breath + np.exp(-np.maximum(0, t - dur * 0.6) / 0.04) * (t > dur * 0.6) * breath * 0.3
+    return ((seg * voice + h * air * 1.6) * amp).astype(np.float32)
+
+
+def _gasp_in(seconds=0.26, level=0.35):
+    """The high, rasping breath in between bouts of a mad laugh."""
+    w = dsp.breath(SR, seconds, inhale=True, effort=0.9, throat=0.9, voiced=0.3, voice_hz=320)
+    return dsp.lowpass(dsp.fade(w, SR, 0.02, 0.04), SR, 5000) * level
+
+
+def _bout(v, vowel, notes, step, slow=1.0, breath=0.5):
+    """notes: [(semis, dur, amp, fall)]; `step` seconds between bursts, stretched by `slow` each time."""
+    parts, at = [], 0.0
+    for semis, dur, amp, fall in notes:
+        parts.append((at, _ha(v, vowel, semis, dur, amp, fall, breath)))
+        at += step
+        step *= slow
+    out = dsp.silence(SR, at + 0.6)
+    for a, x in parts:
+        dsp.mix_into(out, x, int(a * SR))
+    return dsp.trim(out, SR, -45, 0.03)
+
+
 def laugh_core(v, kind):
-    """Vale's laugh, before the room: pieces of TTS laughter, re-pitched into a performance."""
-    def piece(text, speed, semis, tempo=1.0):
-        x = v.say("vale", text, speed)
-        return dsp.pitch(x, SR, semis, tempo)
-
-    def wheeze(seconds=0.3):
-        # The high, voiced gasp between bursts of a mad laugh.
-        w = dsp.breath(SR, seconds, inhale=True, effort=0.8, throat=0.95, voiced=0.7, voice_hz=330)
-        return dsp.lowpass(dsp.fade(w, SR, 0.02, 0.04), SR, 4200) * 0.2
-
+    """
+    Vale laughing: bursts of his own held vowel - each one breathed in on an
+    h, voiced, its pitch falling - in bouts that climb and run down, with
+    the rasping gasps of a man who can't stop. Then his voice (vale_core).
+    """
     if kind == "chuckle":
-        parts = [piece("Heh heh heh.", 0.85, -1.0)]
+        # Low, through the nose almost: heh-heh-heh, running down.
+        x = _bout(v, "ɛ", [(-1, 0.11, 0.6, -1.5), (-1.5, 0.11, 0.65, -1.5), (-2, 0.12, 0.55, -2), (-2.5, 0.13, 0.45, -2.5), (-3.5, 0.17, 0.35, -3.5)], 0.19, 1.06, 0.75)
+        parts = [x]
     elif kind == "cackle":
-        parts = [piece("Ha ha ha ha ha!", 1.1, 2.0, 1.1), wheeze(0.3), piece("Ha. Ha. Ha.", 0.85, -1.5)]
-    else:  # maniac: climbing out of the deep voice into a cackle, and down again
-        parts = [
-            piece("Ha ha ha ha ha!", 1.15, 2.5, 1.15),
-            wheeze(0.3),
-            piece("Mwahahahaha!", 1.0, 5.0),
-            piece("Ha. Ha. Ha.", 0.9, -2.0),
-        ]
-    x = np.concatenate([np.concatenate([p, dsp.silence(SR, 0.04)]) for p in parts])
+        up = _bout(v, "ɑː", [(1, 0.12, 0.8, -2), (2, 0.12, 0.9, -2), (3, 0.13, 1, -2), (4, 0.13, 1, -2.5), (5, 0.14, 1, -2.5), (5.5, 0.32, 1, -5)], 0.17, 1.0)
+        down = _bout(v, "ɑː", [(4, 0.13, 0.85, -2), (3, 0.13, 0.75, -2), (1.5, 0.14, 0.6, -2.5), (0, 0.18, 0.45, -3.5)], 0.2, 1.12)
+        parts = [up, _gasp_in(0.24), down]
+    else:  # maniac: a low chuckle, a climb into a shriek of a laugh, gasps, and down again
+        low = _bout(v, "ɛ", [(-1, 0.11, 0.6, -1.5), (-1, 0.11, 0.7, -1.5), (-0.5, 0.12, 0.75, -2)], 0.2, 1.0, 0.7)
+        climb = _bout(v, "ɑː", [(2, 0.12, 0.85, -2), (3, 0.12, 0.9, -2), (4, 0.12, 0.95, -2), (5, 0.13, 1, -2), (6, 0.13, 1, -2.5), (7, 0.13, 1, -2.5), (7.5, 0.5, 1, -6)], 0.16, 1.0)
+        down = _bout(v, "ɑː", [(6, 0.13, 0.9, -2), (5, 0.13, 0.85, -2), (3.5, 0.14, 0.75, -2.5), (2, 0.15, 0.6, -2.5), (0.5, 0.17, 0.45, -3), (-1, 0.22, 0.3, -4)], 0.19, 1.1)
+        parts = [low, _gasp_in(0.22, 0.25), climb, _gasp_in(0.3, 0.4), down]
+    x = np.concatenate([np.concatenate([p, dsp.silence(SR, 0.02)]) for p in parts])
     x = vale_core(x, wobble=False)
     if kind != "chuckle":
         # Not one voice in that head: a second, a hair sharp and late.
-        twin = dsp.pitch(x, SR, 0.25)
-        x = dsp.mix_into(x.copy(), twin * 0.45, int(SR * 0.021))
+        twin = dsp.pitch(x, SR, 0.2)
+        x = dsp.mix_into(x.copy(), twin * 0.35, int(SR * 0.019))
     return x
 
 
@@ -391,16 +504,29 @@ def pilot(v, line, speed_scale=1.0):
     return dsp.normalize(x, SR, -19), speech
 
 
+def narrator(v, line, speed_scale=1.0):
+    """The briefing: HALCYON's voice telling it, without the PA's chime."""
+    x = v.say("halcyon", tts_text(line["text"]), 0.95 * speed_scale)
+    comb = np.zeros_like(x)
+    d = int(SR * 0.0045)
+    comb[d:] = x[:-d]
+    x = x + comb * 0.18
+    x = dsp.bitcrush(x, 11, 0.06)
+    x = dsp.bandpass(x, SR, 120, 9000, order=1)
+    speech = len(x) / SR
+    x = dsp.reverb(x, SR, rt60=0.9, wet=0.1, predelay=0.015, damp=4500)
+    return dsp.normalize(x, SR, -18), speech
+
+
 def you(v, line, who, speed_scale=1.0):
-    x = v.say(who, tts_text(line["text"]), 0.82 * speed_scale)
-    x = dsp.pitch(x, SR, -0.6)
-    x = dsp.vibrato(x, SR, 5.5, 0.03)
-    x = x * 0.5 + dsp.whisper(x, SR) * 1.4
+    """Subject 07: clear and tired, in the character's own voice."""
+    x = v.say(who, tts_text(line["text"]), 0.9 * speed_scale)
+    x = x + dsp.whisper(x, SR) * 0.35
     throat = 1.12 if who == "you-f" else 0.95
-    lead = dsp.breath(SR, 0.55, inhale=False, effort=0.4, throat=throat) * 0.4
+    lead = dsp.breath(SR, 0.45, inhale=False, effort=0.4, throat=throat) * 0.3
     speech = (len(lead) + len(x)) / SR
     x = np.concatenate([lead, x])
-    return dsp.normalize(room(x, "heli"), SR, -21), speech
+    return dsp.normalize(room(x, "heli"), SR, -18), speech
 
 
 # --------------------------------------------------------------------------
@@ -419,12 +545,14 @@ def render(v, line, scale=1.0):
         return halcyon(v, line, scale)
     if who == "pilot":
         return pilot(v, line, scale)
+    if who == "narrator":
+        return narrator(v, line, scale)
     raise ValueError(who)
 
 
 # How much longer than its subtitle's reading time a line may run before it
 # is sped up (Vale is slow on purpose; the radio has to fit its beat).
-STRETCH = {"okoro": 1.12, "vale": 1.45, "halcyon": 1.5, "pilot": 1.12}
+STRETCH = {"okoro": 1.12, "vale": 1.45, "halcyon": 1.5, "pilot": 1.12, "narrator": 9.0}
 FIXED = {"quietRideRadio": 4.1}
 
 
@@ -476,6 +604,14 @@ def main():
     keep = {k for k in manifest if k.startswith("#")} | {l["key"] for l in lines}
     manifest = {k: manifest[k] for k in sorted(manifest) if k in keep}
     write_manifest(manifest)
+    # Recordings no line uses any more (its words changed) go.
+    used = set()
+    for file, *rest in manifest.values():
+        used |= {f"{file}-f.mp3", f"{file}-m.mp3"} if len(rest) > 2 and rest[2] else {f"{file}.mp3"}
+    for f in os.listdir(OUT):
+        if f.endswith(".mp3") and f not in used:
+            os.remove(os.path.join(OUT, f))
+            print(f"removed {f} (no longer used)")
 
 
 def read_manifest():

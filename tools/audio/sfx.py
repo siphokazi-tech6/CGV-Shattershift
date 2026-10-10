@@ -12,8 +12,8 @@ Writes assets/audio/sfx/*.mp3:
                         corridor - a seamless loop
   breath-*-f / -m       the player (by the character picked): running pant
                         (loop), exhausted panting, frightened held breath,
-                        breathing slowing down, effort grunt, pain grunts,
-                        a fall scream
+                        breathing slowing down; effort and pain - no words,
+                        the character's own voice strained - and a fall scream
   demolition-charges    the charges going off floor by floor, far away
   building-collapse     a tower coming down: rumble, crumbling concrete,
                         steel groaning and snapping, glass, dust
@@ -196,33 +196,89 @@ def recover(g):
 
 
 class PlayerVoice:
-    """Grunts and screams from Kokoro, for the effort and the pain."""
+    """The player's own voice (Kokoro: af_heart / am_puck, as voices.py's Subject 07)."""
+
+    VOICES = {"f": "af_heart", "m": "am_puck"}
 
     def __init__(self, model_dir):
         self.k = None
+        self._held = {}
         if model_dir:
             from kokoro_onnx import Kokoro
             self.k = Kokoro(os.path.join(model_dir, "kokoro-v1.0.onnx"), os.path.join(model_dir, "voices-v1.0.bin"))
 
-    def say(self, g, text, speed=1.0):
-        voice = "af_heart" if g == "f" else "am_echo"
-        samples, sr = self.k.create(text, voice=self.k.get_voice_style(voice), speed=speed, lang="en-us")
+    def _create(self, g, text, speed, phonemes=False):
+        samples, sr = self.k.create(text, voice=self.k.get_voice_style(self.VOICES[g]), speed=speed, lang="en-us", is_phonemes=phonemes)
         x = signal.resample_poly(samples.astype(np.float32), SR, sr).astype(np.float32)
         return dsp.trim(x, SR, -45, 0.01)
 
+    def say(self, g, text, speed=1.0):
+        return self._create(g, text, speed)
 
-def strain(x):
-    """A grunt from the gut: tight, pushed, breathy."""
-    x = dsp.eq(x, SR, "peak", 1500, 5, 0.9)
-    x = dsp.drive(dsp.peak_normalize(x, 0.9), 2.4)
-    return x + dsp.whisper(x, SR) * 0.6
+    def held(self, g, vowel="ʌ"):
+        """A vowel held in the character's voice: the raw stuff of a grunt (not a word)."""
+        if (g, vowel) not in self._held:
+            x = self._create(g, vowel * 6 + ".", 0.6, phonemes=True)
+            env = dsp.envelope(x, SR, 0.02)
+            on = np.nonzero(env > env.max() * 0.4)[0]
+            self._held[(g, vowel)] = x[on[0] + int(0.06 * SR): on[-1] - int(0.06 * SR)]
+        return self._held[(g, vowel)]
 
 
-def grunt(voice, g, text, semis=0.0, speed=1.1, level=-18):
-    x = voice.say(g, text, speed)
-    x = dsp.pitch(x, SR, semis)
-    x = strain(x)
-    return dsp.normalize(dsp.reverb(dsp.fade(x, SR, 0.005, 0.06), SR, rt60=0.3, wet=0.08), SR, level)
+def strain(x, amount=1.0):
+    """From the gut: tight, pushed, breathy."""
+    x = dsp.eq(x, SR, "peak", 1500, 4 * amount, 0.9)
+    x = dsp.drive(dsp.peak_normalize(x, 0.9), 1 + 1.2 * amount)
+    return x + dsp.whisper(x, SR) * 0.5
+
+
+def _glide(x, semis):
+    n = len(x)
+    pos = np.cumsum(2 ** (np.linspace(0, semis, n) / 12))
+    pos = pos[pos < n - 1]
+    return np.interp(pos, np.arange(n), x).astype(np.float32)
+
+
+def pain(voice, g, variant):
+    """
+    Hit: no word - the breath knocked in, then a short strained "uh" that
+    drops away, in the character's own voice.
+    """
+    dur, semis, fall, catch = [(0.2, 2.0, -3.0, 0.07), (0.26, 3.0, -4.0, 0.06), (0.17, 1.0, -2.5, 0.09)][variant]
+    vowel = voice.held(g, "ʌ" if variant != 1 else "ɐ")
+    start = int(R.integers(0, max(1, len(vowel) - int((dur + 0.15) * SR))))
+    seg = dsp.pitch(vowel[start:start + int((dur + 0.15) * SR)], SR, semis)
+    seg = _glide(seg, fall)[: int(dur * SR)]
+    t = np.arange(len(seg)) / SR
+    seg = seg * np.minimum(1, t / 0.008) * np.exp(-t / (dur * 0.45))
+    seg = strain(seg, 0.8)
+    throat = GENDER[g]["throat"]
+    knock = dsp.breath(SR, catch, inhale=True, effort=1.0, throat=throat) * 0.6
+    air = dsp.breath(SR, dur + 0.1, inhale=False, effort=0.8, throat=throat) * 0.35
+    out = dsp.silence(SR, catch + dur + 0.25)
+    dsp.mix_into(out, knock, 0)
+    dsp.mix_into(out, seg, int(catch * SR))
+    dsp.mix_into(out, air, int((catch + 0.02) * SR))
+    return dsp.normalize(dsp.reverb(dsp.fade(out, SR, 0.002, 0.05), SR, rt60=0.3, wet=0.08), SR, -17)
+
+
+def effort(voice, g):
+    """Pulling up, jumping: a held, pushing strain that breaks off in a breath out."""
+    vowel = voice.held(g, "ʌ")
+    seg = dsp.pitch(vowel[: int(0.62 * SR)], SR, 1.5)
+    t = np.arange(len(seg)) / SR
+    rise = 2 ** (np.interp(t, [0, 0.35, 0.6], [0, 1.5, -1.5]) / 12)
+    pos = np.cumsum(rise)
+    pos = pos[pos < len(seg) - 1]
+    seg = np.interp(pos, np.arange(len(seg)), seg).astype(np.float32)
+    t = np.arange(len(seg)) / SR
+    seg = seg * np.minimum(1, t / 0.05) * np.clip((len(seg) / SR - t) / 0.12, 0, 1)
+    seg = strain(seg, 1.1) * 0.8
+    throat = GENDER[g]["throat"]
+    out = dsp.silence(SR, len(seg) / SR + 0.6)
+    dsp.mix_into(out, seg, 0)
+    dsp.mix_into(out, dsp.breath(SR, 0.45, inhale=False, effort=0.9, throat=throat, voiced=0.2, voice_hz=GENDER[g]["f0"]) * 0.5, int((len(seg) / SR - 0.05) * SR))
+    return dsp.normalize(dsp.reverb(out, SR, rt60=0.3, wet=0.08), SR, -18)
 
 
 def fall_scream(voice, g):
@@ -633,10 +689,10 @@ def main():
         voice = PlayerVoice(args.model)
         for g in ("f", "m"):
             for name, job in {
-                f"grunt-{g}": lambda: grunt(voice, g, "Hnngh!", -1.0, 1.0),
-                f"hurt-1-{g}": lambda: grunt(voice, g, "Ugh!", 0.0, 1.2, -17),
-                f"hurt-2-{g}": lambda: grunt(voice, g, "Agh!", 0.5, 1.2, -17),
-                f"hurt-3-{g}": lambda: grunt(voice, g, "Nngh!", -0.5, 1.1, -17),
+                f"grunt-{g}": lambda: effort(voice, g),
+                f"hurt-1-{g}": lambda: pain(voice, g, 0),
+                f"hurt-2-{g}": lambda: pain(voice, g, 1),
+                f"hurt-3-{g}": lambda: pain(voice, g, 2),
                 f"scream-{g}": lambda: fall_scream(voice, g),
             }.items():
                 if args.only and args.only not in name:

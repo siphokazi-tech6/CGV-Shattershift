@@ -89,11 +89,12 @@ The **pause menu** has the same buttons (resume, settings, restart, quit) and a 
 
 Every line is **voice acted**, every stage has **its own score**, and the tower sounds like it is burning and falling down. All of it is made by the scripts in `tools/audio/` (an open text-to-speech model and synthesis in code - see [`tools/audio/README.md`](./tools/audio/README.md)), so there is nothing to license and a changed line can be re-recorded in a minute.
 
-- **Dr. Okoro** is an ordinary scientist, terrified: his voice shakes, he gasps for air between sentences on the run, whispers behind the desk and shouts in the lift.
+- **Dr. Okoro** is a Nigerian doctor, terrified: he speaks Nigerian English, breathes hard in his pauses and pants as he runs through the Foundry explaining things to Seven, whispers behind the desk and shouts in the lift.
 - **Dr. Vale** is deep, slow and wrong - a growl under his voice and a whisper beside it - over the tower's intercom (the Labs when the lights die, the Skyline, the roof as he lets them out), with laughter after his taunts and a mad laugh in the helicopter. The pilot on the radio is his own voice, undisguised.
-- **HALCYON**, the building, announces after a chime; the **patients** growl, shriek, moan and beg ("help me", "it hurts") from wherever they are, and gurgle as they go down.
+- **HALCYON**, the building's automatic system, makes its announcements to all personnel after a chime - it is on nobody's side - and the same voice **narrates the briefing film**; the **patients** growl, shriek, moan and beg ("help me", "it hurts") from wherever they are, and gurgle as they go down.
+- **Subject 07** speaks in the voice of the character picked (female or male), and cries out without words when hit.
 - **The tower:** the fire alarm (it dies with the power in the Labs), your own huffing and puffing as you run (harder as you tire - the character you picked), pain when you're hit, demolition charges and the whole tower coming down on the Skyline, explosions, steel groaning, sprinklers bursting, glass everywhere.
-- **Music:** the Foundry is industrial (a press, an anvil, the countdown ticking), the Labs are horror (drone, heartbeat, a music box), the Skyline is the escape, the Roof the last stand; the wake-up and the failing lift are suspense, the quiet ride after Okoro is grief. The briefing keeps its piano and the ending the main theme. The music steps back whenever someone speaks.
+- **Music:** the Foundry is industrial (a press, an anvil, the countdown ticking), the Labs are horror (drone, heartbeat, a music box), the Skyline is the escape, the Roof the last stand; the wake-up and the failing lift are suspense, the quiet ride after Okoro is grief. The briefing keeps its piano under the narration, and the ending the main theme. Inside the lifts their own music plays (except in the story's two scored rides). The music steps back whenever someone speaks.
 - Stage directions in the subtitles are heard too: `[a pistol shot]`, `[breathing hard]`, `[laughs]`.
 
 ## Play locally

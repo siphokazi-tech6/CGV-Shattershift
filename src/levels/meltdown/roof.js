@@ -1674,6 +1674,7 @@ export class RoofLevel {
     this.cutscene = {
       kind: "arrival", camera: new THREE.Vector3(), look: new THREE.Vector3(), player: new THREE.Vector3(),
       playerYaw: 0, action: "stand", timeScale: 1, done: false, hidePlayer: false, hold: 1, reachUp: 0,
+      elevatorInside: true, elevatorVelocity: 0,
     };
     this._updateArrival(0);
     return this.cutscene;
@@ -1699,6 +1700,7 @@ export class RoofLevel {
     out.playerYaw = 0;
     out.action = t > 1.2 && t < 2.8 ? "run" : "stand";
     out.speed = out.action === "run" ? 4.5 : 0;
+    out.elevatorInside = walk < 1;
 
     // In front of the housing, dollying back as the player walks toward the
     // camera; then a cut to the game camera (a swing round would turn the

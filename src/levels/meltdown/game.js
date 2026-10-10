@@ -631,6 +631,8 @@ export class MeltdownGame {
 
   setCharacter(name) {
     if (!CHARACTERS[name]) return;
+    // The player's breath and voice follow the character (level1-audio.js).
+    this.sfx?.setCharacter?.(name);
     this.character = name;
     saveCharacter(name);
     this._loadCharacter(name);

@@ -15,6 +15,7 @@ they write. The game never runs them: it only plays the files.
 | `music.py` | `assets/audio/music/*.mp3` | Each stage's score, as seamless loops |
 | `dsp.py` | - | The shared signal processing (filters, reverb, pitch, whisper, breath, loudness) |
 | `intelligibility.py` | (report) | A machine listener's check that the words survive each character's processing |
+| `accent.py` | - | Nigerian English pronunciation for Okoro (Kokoro has no Nigerian voice) |
 
 ## Setting up (once)
 
@@ -62,11 +63,12 @@ blip instead (a line is found by its exact words).
 
 | Who | Kokoro voice | The performance (`voices.py`) |
 | --- | --- | --- |
-| Dr. Okoro | `am_michael` | An ordinary man, terrified: pitch pushed up, a shaking voice (vibrato and tremor), breathy, gasping between sentences; whispering behind the desk, shouting in the lift and when he draws them off |
+| Dr. Okoro | `am_onyx` + `bm_daniel`, in Nigerian English (`accent.py`) | A Nigerian doctor, terrified: one flowing take per line, pitch pushed up, breathing in the pauses between phrases and, as he runs through the Foundry, panting under his words; whispering behind the desk, shouting in the lift and when he draws them off |
 | Dr. Vale | `bm_george` + `bm_lewis` | Slow and deep: the throat and pitch dropped ~4.5 semitones, a sub-octave growl and a whispered double under the voice; the intercom's echo through the tower; laughter after his taunts and a long mad laugh in the helicopter |
-| HALCYON | `bf_emma` | The building: calm, a little metallic, over the PA after a two-note chime |
+| HALCYON | `bf_emma` | The building's automatic system - announcements to all personnel, on nobody's side: calm, a little metallic, over the PA after a two-note chime |
+| The narrator | `bf_emma` | HALCYON's voice reading the briefing film, without the chime |
 | The pilot | Vale's voice, undisguised | Over a headset, and as "Kestrel One" on the radio in the lift (it is Vale: the reveal is heard as well as seen) |
-| Subject 07 | `af_heart` / `am_echo` | By the character picked: exhausted, breathy |
+| Subject 07 | `af_heart` / `am_puck` | By the character picked: a clear, tired voice. Pain and effort are wordless - the character's own voice, strained (`sfx.py`) |
 | The patients | `am_onyx`, `bm_lewis`, `am_adam`, `bf_isabella`, `af_nicole`, `am_fenrir` | Bigger throats, lower pitch, a rattle (vocal fry), grit, a whisper of breath, and a wet gurgle as they die |
 
 ## Loudness
@@ -95,3 +97,18 @@ version, with a long PA echo and a strong throat shift, fell from 78% to 21%,
 so the depth now comes mostly from pitch (formants kept) and the intercom is
 one short slap and a short room (38%, most of what is left being how deep he
 is); HALCYON's PA was thinned the same way.
+
+## Okoro's accent
+
+Kokoro has no Nigerian English voice, and no Nigerian-accented speech model
+could be downloaded where these files were made, so `accent.py` writes the
+accent into the pronunciation instead: Kokoro is given phonemes, not text.
+From the descriptions of Nigerian English: full vowels where British and
+American English reduce them ("about" a-baut, "sister" sis-ta, "doctor"
+dok-ta), TH-stopping ("the" de, "think" tink), FACE and GOAT as single
+vowels ("day" de, "go" go), the vowel mergers (KIT/FLEECE, FOOT/GOOSE,
+TRAP/BATH; STRUT and LOT/THOUGHT as an open o, NURSE as an open e), no r
+after a vowel and a tapped r before one, and an even, syllable-timed rhythm.
+It is an approximation by rule. If someone can record Okoro's lines in a real
+Nigerian voice, save each over its file in `assets/audio/voice/` (the names
+are in `src/audio/voice-lines.js`) and the game plays them as they are.

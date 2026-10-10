@@ -845,6 +845,8 @@ export class MeltdownLevel {
     const u = THREE.MathUtils.clamp((t - 1.8) / 1.1, 0, 1);
     const start = api.cabinCentre.z * 0.7;
     lift.localToWorld(out.player.set(0, 0, start * (1 - u * u)));
+    out.elevatorInside = u < 1;
+    out.elevatorVelocity = 0;
     out.playerYaw = lift.rotation.y;
     out.action = u > 0 && u < 1 ? "run" : "stand";
     out.speed = u * 7.5;
@@ -903,6 +905,7 @@ export class MeltdownLevel {
     out.action = u < 1 ? "run" : "stand";
     out.fire = this.route.totalLength - 34 + 26 * smooth(t, 0, DEPART_RUN + 2.5);
 
+    let elevatorVelocity = 0;
     if (t < DEPART_RIDE) {
       root.localToWorld(out.player.set(0, 0, from * (1 - u) * (1 - u)));
       // The camera follows onto the landing, then settles behind the cabin.
@@ -917,6 +920,7 @@ export class MeltdownLevel {
         a.ride = true;
       }
       const ride = lift.update(dt, t, reduced);
+      elevatorVelocity = ride.velocity;
       once("lift-close", DEPART_RIDE);
       once("lift-depart", DEPART_RIDE + 1);
       lift.floorPoint(out.player);
@@ -928,6 +932,8 @@ export class MeltdownLevel {
         this._departure = null;
       }
     }
+    out.elevatorInside = lift.containsPoint(out.player);
+    out.elevatorVelocity = elevatorVelocity;
     return out;
   }
 
@@ -935,6 +941,7 @@ export class MeltdownLevel {
     return {
       kind, camera: new THREE.Vector3(), look: new THREE.Vector3(), player: new THREE.Vector3(),
       playerYaw: 0, action: "stand", speed: 0, hold: 1, reachUp: 0, shake: 0, fade: 0, fire: null, done: false,
+      elevatorInside: false, elevatorVelocity: 0,
     };
   }
 

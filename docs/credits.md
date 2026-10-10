@@ -169,7 +169,9 @@ Level 1 sound effects supplied to the project:
 - Falling object: `dragon-studio-falling-tree-356127.mp3` — Dragon Studio.
 - Game over: `universfield-marimba-game-over-250960.mp3` — Universfield.
 - Broken-glass footstep: `368343__johandeecke__glass-hit-32.wav` — JohanDeecke.
-- Elevator, and the wind on the roof: `wind1.wav` — source and licence details pending.
+- The wind on the roof: `wind1.wav` — source and licence details pending.
+- The lifts' machinery: `174908__oneirophile__noisy-old-elevator.wav` (in `soundtracks/`) — Oneirophile, Freesound (sound 174908); licence to be recorded by the supplier.
+- The lifts' music: `freesound_community-lift-music-by-kk-30497.mp3` (in `soundtracks/`) — "Lift Music" by KK, Freesound Community; licence to be recorded by the supplier.
 - Sphere throw: `floraphonic-swing-whoosh-9-198502.mp3` — Floraphonic.
 - Sphere cache / serum collected: `floraphonic-arcade-ui-6-229503.mp3` — Floraphonic.
 - Side-wall / ceiling ricochet: `freesound_community-wall-hit-1-100717.mp3` — Freesound Community.
@@ -185,9 +187,9 @@ Made offline by the scripts in `tools/audio/` (how, and how to re-record a line:
 
 | Asset | Made with | Licence of what was used | Used in |
 | --- | --- | --- | --- |
-| Voice acting for every line (`assets/audio/voice/`, listed in `src/audio/voice-lines.js`): Dr. Okoro, Dr. Vale and his laugh, HALCYON, the pilot, Subject 07 | Kokoro-82M text-to-speech (hexgrad, https://huggingface.co/hexgrad/Kokoro-82M) run through kokoro-onnx (thewh1teagle, https://github.com/thewh1teagle/kokoro-onnx); voices `am_michael`, `bm_george`, `bm_lewis`, `bf_emma`, `af_heart`, `am_echo`; then each character's processing (`tools/audio/voices.py`) | Kokoro-82M: Apache-2.0; kokoro-onnx: MIT. The model's output is ours to use | Every cutscene, Okoro's talk in the Foundry and the lift, the Skyline's intercom, Vale on the Labs' and the roof's PA, the lift's radio |
+| Voice acting for every line (`assets/audio/voice/`, listed in `src/audio/voice-lines.js`): Dr. Okoro (in Nigerian English, `tools/audio/accent.py`), Dr. Vale and his laugh, HALCYON, the briefing's narrator, the pilot, Subject 07 | Kokoro-82M text-to-speech (hexgrad, https://huggingface.co/hexgrad/Kokoro-82M) run through kokoro-onnx (thewh1teagle, https://github.com/thewh1teagle/kokoro-onnx); voices `am_onyx`, `bm_daniel`, `bm_george`, `bm_lewis`, `bf_emma`, `af_heart`, `am_puck`; then each character's processing (`tools/audio/voices.py`) | Kokoro-82M: Apache-2.0; kokoro-onnx: MIT. The model's output is ours to use | Every cutscene, the briefing film, Okoro's talk in the Foundry and the lift, the Skyline's intercom, Vale on the Labs' and the roof's PA, the lift's radio |
 | The patients (`assets/audio/creatures/`): growls, moans, broken speech, shrieks, pain, death, roar, horde | Kokoro-82M (voices `am_onyx`, `bm_lewis`, `am_adam`, `bf_isabella`, `af_nicole`, `am_fenrir`), processed into creature sounds (`tools/audio/creatures.py`) | As above | The Labs and the Roof |
-| Effects (`assets/audio/sfx/`): fire alarm, the player's breathing, grunts, pain and fall scream, demolition charges, building collapse, explosions, distant collapses, steel groaning, debris, sprinkler burst, monitor beep, pistol, clatter, brakes, cable snap, lift chime and doors, clank, spark | Synthesized from first principles in numpy/scipy (`tools/audio/sfx.py`); the player's grunts and scream from Kokoro (`af_heart`, `am_echo`) | Our own | Every level and the lifts |
+| Effects (`assets/audio/sfx/`): fire alarm, the player's breathing, effort, pain and fall scream, demolition charges, building collapse, explosions, distant collapses, steel groaning, debris, sprinkler burst, monitor beep, pistol, clatter, brakes, cable snap, lift chime and doors, clank, spark | Synthesized from first principles in numpy/scipy (`tools/audio/sfx.py`); the player's effort, pain and scream from Kokoro (`af_heart`, `am_puck`: held vowels, strained, no words) | Our own | Every level and the lifts |
 | `glass-cascade.mp3` | Mixed from the team's supplied glass recordings above (Eaglaxle's shattering, Universfield's bottle), re-pitched, layered and spread | As those recordings | The breach's "glass, everywhere" |
 | Stage scores (`assets/audio/music/`): foundry, labs, skyline, roof, tension, grief | Composed and synthesized in code (`tools/audio/music.py`): wavetable oscillators, filters, drums, convolution reverb | Our own | The Foundry, the Labs, the Skyline, the Roof, the wake-up and the Gravity Fault lift, the quiet ride |
 

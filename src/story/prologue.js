@@ -1,11 +1,12 @@
 /**
  * The prologue: everything before the game, as a short in-engine film - the
- * start screen's "briefing". No voice: chapter cards and typed captions over
- * staged shots, with the story track under it. It explains what Project
+ * start screen's "briefing". Chapter cards and typed captions over staged
+ * shots, each caption read by the narrator (HALCYON's voice - recorded by
+ * tools/audio/voices.py), with the story track under it. It explains what Project
  * Ascension was for, why the patients were taken, who ran it, what went wrong,
  * how it was found out, and why the tower is coming down tonight.
  *
- *   const prologue = new Prologue({ renderer, assetBase, character });
+ *   const prologue = new Prologue({ renderer, assetBase, character, voice });
  *   await prologue.load();                 // the models it stages
  *   prologue.start(() => backToTheMenu());
  *   // each frame while it runs:
@@ -31,13 +32,14 @@ import { WardStage } from "./stages/ward.js";
 import { PoliceHelicopters } from "../fx/police-helicopters.js";
 import { createPropKit } from "./stages/props.js";
 import { CityAtNight } from "../levels/meltdown/city.js";
+import { VOICE_LINES } from "../audio/voice-lines.js";
 
 /**
  * The film, chapter by chapter: which set, how long, the card and the
  * caption, and the camera's move (from -> to, each { pos, look }, in the set's
  * own coordinates). Edit the words here.
  */
-export const CHAPTERS = [
+const FILM = [
   {
     set: "city", seconds: 10, tag: "01", title: "Ascension Tower",
     text: "The Meridian Institute owned the top forty floors of Ascension Tower. The city thought it was a hospital.",
@@ -88,6 +90,19 @@ export const CHAPTERS = [
     from: { pos: [0.8, 1.7, -3.8], look: [-0.6, 1.1, 2] }, to: { pos: [0.2, 1.6, -2.4], look: [-1.2, 1.0, 1.8] },
   },
 ];
+
+/** Seconds into a chapter when the narrator starts (after the fade from black). */
+const NARRATION_AT = 0.7;
+
+/**
+ * The film as it plays: each chapter at least as long as its narration takes
+ * (the recordings are listed in src/audio/voice-lines.js), so no line is cut
+ * off by the next chapter.
+ */
+export const CHAPTERS = FILM.map((c) => {
+  const spoken = VOICE_LINES[`narrator|${c.text}`]?.[1] ?? 0;
+  return { ...c, seconds: Math.max(c.seconds, spoken ? NARRATION_AT + spoken + 1.1 : 0) };
+});
 
 const STYLE = `
 .prologue { position: fixed; inset: 0; z-index: 40; pointer-events: none; font-family: Inter, "Segoe UI", Arial, sans-serif; color: #eef4f6; }
@@ -213,11 +228,14 @@ export class Prologue {
    * @param {THREE.WebGLRenderer} o.renderer
    * @param {string} o.assetBase     URL of assets/meltdown/
    * @param {string} [o.character]   the player character's asset key
+   * @param {{say(line:object):void, stop():void, preload(lines:object[]):void}} [o.voice]  the narrator (story/voice.js)
    */
-  constructor({ renderer, assetBase, character = "playerFemale" }) {
+  constructor({ renderer, assetBase, character = "playerFemale", voice = null }) {
     this.renderer = renderer;
     this.assetBase = assetBase;
     this.character = character;
+    this.voice = voice;
+    this.narrated = new Set();
     this.active = false;
     this.loaded = false;
     this.owned = [];
@@ -1018,6 +1036,8 @@ export class Prologue {
     this.active = true;
     this.t = 0;
     this.chapter = -1;
+    this.narrated.clear();
+    this.voice?.preload(CHAPTERS.map((c) => ({ who: "narrator", text: c.text })));
     this.ended = false;
     this.ui.root.hidden = false;
     this.ui.end.classList.remove("show");
@@ -1033,6 +1053,7 @@ export class Prologue {
 
   _finish() {
     this.active = false;
+    this.voice?.stop();
     this.ui.root.hidden = true;
     this.ui.card.classList.remove("show");
     const done = this.onDone;
@@ -1075,6 +1096,11 @@ export class Prologue {
     }
     const { index, chapter, local, k } = at;
     if (index !== this.chapter) this._enterChapter(index, chapter);
+    // The narrator reads the caption as it types out.
+    if (local >= NARRATION_AT && !this.narrated.has(index)) {
+      this.narrated.add(index);
+      this.voice?.say({ who: "narrator", text: chapter.text });
+    }
     // Fade through black between chapters.
     const fade = Math.max(1 - smooth(local, 0, 0.7), smooth(local, chapter.seconds - 0.6, chapter.seconds));
     this.ui.fade.style.opacity = fade.toFixed(3);

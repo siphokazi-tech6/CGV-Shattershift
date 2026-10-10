@@ -1137,6 +1137,7 @@ function shatterCauseway(target, hit) {
 
 function startCausewayLift() {
   if (state !== "playing" || currentLevel !== 1) return;
+  music.enterElevator();
   state = "lift";
   liftTimer = 0;
   transitionTarget = 2;
@@ -1459,6 +1460,7 @@ function getMeltdown() {
 /** Level 2's end: the player is in the Calibration Lift; the doors close and it rides up. */
 function startFoundryLift() {
   if (state !== "playing" || currentLevel !== 2) return;
+  music.enterElevator();
   state = "lift"; liftTimer = 0; transitionTarget = 3;
   run.liftFrom.copy(camera.position);
   foundryLift.start();
@@ -1570,6 +1572,11 @@ let pendingSkyline = false;
 function updateMeltdownFrame(dt, time) {
   if (!meltdown) return;
   meltdown.update(dt, time);
+  const liftCut = meltdown.cut;
+  const insideElevator = Boolean(liftCut?.elevatorInside);
+  if (insideElevator) music.enterElevator();
+  else music.exitElevator();
+  level1Audio.updateElevator(liftCut?.elevatorVelocity ?? 0, insideElevator && !liftCut?.done);
   if (pendingSkyline) {
     pendingSkyline = false;
     // The scientist's sacrifice at the lift, then the quiet ride up.
@@ -2012,6 +2019,7 @@ const FOUNDRY_LIFT_HANDOFF = 2.2;
  */
 function startGravityLift({ boarded = false } = {}) {
   if (gravityLift) return;
+  music.enterElevator();
   currentLevel = 2; state = "lift"; transitionTarget = 3; liftTimer = 0;
   // Okoro leaves the main scene with the Foundry (the ride has its own scene).
   foundryGuide = null;
@@ -2048,6 +2056,7 @@ function startGravityLift({ boarded = false } = {}) {
 
 function updateGravityLiftFrame(dt, time) {
   gravityLift.update(dt, time);
+  level1Audio.updateElevator(gravityLift.state?.velocity ?? gravityLift.speed ?? 0, !gravityLift.result.done);
   ui.fade.style.opacity = gravityLift.fade.toFixed(3);
   // A cutscene ride hides the game's HUD while it plays.
   document.body.classList.toggle("cutscene", !!gravityLift.cutscene);
@@ -2070,6 +2079,7 @@ function startQuietRide() {
   if (currentLevel === 3) leaveMeltdown(1);
   setFoundryActive(false);
   state = "lift"; transitionTarget = 0; liftTimer = 0;
+  music.enterElevator();
   // Build the Skyline now, behind the fade-in, so it is ready when the ride ends.
   if (!causeway) buildCauseway("story");
   if (causeway) setCausewayActive(false);
@@ -2131,16 +2141,19 @@ function finishGravityLift() {
   const { bonus, spheres } = gravityLift.result;
   score += bonus;
   ammo = spheres;
-  leaveGravityLift();
+  // Both destinations open in an arrival lift, so keep the interior mix
+  // through the black handoff instead of briefly restoring the Level track.
+  leaveGravityLift({ preserveInterior: true });
   updateUI();
   if (rideNext === "skyline") enterSkyline();
   else enterMeltdown();
 }
 
 /** Free the ride (finished, restart, quit or a demo jump). */
-function leaveGravityLift() {
-  if (!gravityLift) return;
-  gravityLift.dispose();
+function leaveGravityLift({ preserveInterior = false } = {}) {
+  level1Audio.updateElevator(0, false);
+  if (!preserveInterior) music.exitElevator();
+  if (gravityLift) gravityLift.dispose();
   gravityLift = null;
   document.body.classList.remove("cutscene");
 }
@@ -2837,6 +2850,7 @@ function enterSkyline() {
     storyCheckpoint = { stage: "skyline", score, ammo, balls: storyBalls };
   } else disposeSkylineStory();
   state = "launch"; launchTimer = 0;
+  music.enterElevator();
   level1Audio.startLevel();
   music.playStage("skyline");
   level1Audio.preloadStage("skyline");
@@ -2921,6 +2935,7 @@ function startEndless(env) {
  * the top ("Restart run" on the pause menu always starts the run over).
  */
 function restartRun({ fromTop = false } = {}) {
+  leaveGravityLift();
   if (runKind === "endless" && endlessEnv) startEndless(endlessEnv);
   else if (!fromTop && storyDeath && storyCheckpoint) restartStage(storyCheckpoint);
   else startCampaign();
@@ -3140,6 +3155,9 @@ const failReasons = {
 function endRun(won, reason = null, detail = null) {
   if (state === "ended") return;
   state = "ended"; ui.final.textContent = String(Math.floor(score)).padStart(6, "0");
+  // A failed run stops the lift itself; its interior music follows the
+  // existing game-over duck without leaving machinery grinding forever.
+  level1Audio.updateElevator(0, false);
   // A death in the story: the end screen offers that sector again.
   storyDeath = !won && storyRun && runKind === "story" && !!storyCheckpoint;
   restartButtonLabel();
@@ -3242,6 +3260,8 @@ function updateLaunch(dt, time) {
   const cabinZ = skylineLift ? skylineLift.root.position.z : CAUSEWAY_ORIGIN_Z + 6;
   const z = THREE.MathUtils.lerp(cabinZ, CAUSEWAY_ORIGIN_Z + 0.15, u * u);
   camera.position.set(0, 1.72 + Math.sin(t * 9) * 0.015 * u, z);
+  if (skylineLift?.containsPoint(camera.position)) music.enterElevator();
+  else music.exitElevator();
   camera.up.set(0, 1, 0);
   camera.lookAt(0, 1.6, z - 12);
   avatar.visible = false;
@@ -3389,7 +3409,7 @@ function updateGame(dt, time) {
       } else if (foundry && (foundryExit || foundryDistance() > foundry.route.totalLength - 4)) {
         foundryExit = true;
         lane = 1;
-        if (foundryLift && runZ <= foundryLift.root.position.z) {
+        if (foundryLift && foundryLift.containsPoint(foundryCentre)) {
           runZ = foundryLift.root.position.z;
           startFoundryLift();
         } else if (!foundryLift) {
@@ -3654,6 +3674,7 @@ function quitToMenu() {
     else endlessResult();
   }
   closePause(); cancelStory();
+  leaveGravityLift();
   document.body.classList.remove("finale-film");
   storyRun = false;
   // Nobody keeps talking over the menu (the intercom, a line mid-sentence).
@@ -3699,7 +3720,7 @@ async function startStory() {
   ui.storyLine.classList.add("show");
   // The sleeping Subject 07 in it is whoever you play as.
   if (prologue && prologue.character !== savedCharacter()) { prologue.dispose(); prologue = null; }
-  prologue ??= new Prologue({ renderer, assetBase: MELTDOWN_ASSET_BASE, character: savedCharacter() });
+  prologue ??= new Prologue({ renderer, assetBase: MELTDOWN_ASSET_BASE, character: savedCharacter(), voice: story.voice });
   try {
     await prologue.load();
   } catch (error) {

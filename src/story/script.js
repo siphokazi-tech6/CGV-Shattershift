@@ -55,6 +55,7 @@ export const CAST = {
   vale: { name: "DR. VALE", colour: "#ff5a4e", pitch: 0.72 },
   pilot: { name: "PILOT", colour: "#c9d1d6", pitch: 0.72 },
   halcyon: { name: "HALCYON", colour: "#ffb547", pitch: 1.5 },
+  narrator: { name: "", colour: "#ffb547", pitch: 1.5 },
   you: { name: "07", colour: "#e8eef2", pitch: 1.15 },
   sfx: { name: "", colour: "#9aa7ad", pitch: 0 },
 };
